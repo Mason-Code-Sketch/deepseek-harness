@@ -45,20 +45,35 @@ button.leading {
   transition: opacity 100ms ease;
 }
 
-.chevronHover {
+/* The chevron overlays the idle icon as a pointer-events-none indicator, so it
+   never intercepts the row/title click. Hidden at rest; fades in on hover
+   (pointing down) and stays up while the row is expanded. */
+.chevronSlot {
   position: absolute;
   inset: 0;
   margin: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
   opacity: 0;
   transition: opacity 100ms ease;
 }
 
-.row:hover .iconIdle {
-  opacity: 0;
+/* Hover preview only when the consumer opts in (previewChevron). */
+.row:hover .chevronSlot[data-row-chevron="preview"] {
+  opacity: 1;
 }
 
-.row:hover .chevronHover {
+/* Expanded always reveals the chevron and rotates it to point up, so the open
+   state is unambiguous while the icon stays visible behind it. */
+.root[data-open] .chevronSlot {
   opacity: 1;
+}
+
+.root[data-open] .chevron {
+  transform: rotate(180deg);
+  transition: transform 100ms ease;
 }
 
 .title {

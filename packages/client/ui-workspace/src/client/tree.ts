@@ -12,6 +12,9 @@ import {
 /** Group key for Sessions outside every Workspace. */
 export const UNGROUPED_KEY = ''
 
+/** Group key for the pinned Sessions section above every Workspace group. */
+export const PINNED_KEY = '__pinned__'
+
 /** Display label for the ungrouped bucket row. */
 export const UNGROUPED_LABEL = 'Ungrouped'
 
@@ -30,6 +33,8 @@ export interface SessionNode {
   /** Finished running while not selected and not yet opened (the green "done" reminder dot). */
   completed: boolean
   updatedAt: number
+  /** The session is pinned: the row floats to the top of its group / the flat list. */
+  pinned: boolean
 }
 
 /** Session order selected by the Workspace browser. */
@@ -37,12 +42,12 @@ export type SessionOrderBy = 'manual' | 'updated'
 
 /** One workspace group section: header row facts + visible top-level session rows. */
 export interface GroupNode {
-  /** Group key: the workspace id or {@link UNGROUPED_KEY}. */
+  /** Group key: the workspace id, {@link UNGROUPED_KEY}, or {@link PINNED_KEY}. */
   key: string
-  /** Backing Workspace id; absent only for the ungrouped bucket. */
+  /** Backing Workspace id; absent for the ungrouped bucket and the pinned section. */
   workspaceId: WorkspaceId | undefined
   cwd: string | undefined
-  /** Workspace creation time (epoch ms); absent only for the ungrouped bucket. */
+  /** Workspace creation time (epoch ms); absent only for the ungrouped bucket and the pinned section. */
   createdAt: number | undefined
   label: string
   /** Total visible sessions in the group. */
@@ -50,6 +55,8 @@ export interface GroupNode {
   expanded: boolean
   /** The group contains the selected session (active folder tint; supplied here so the renderer never scans). */
   containsCurrent: boolean
+  /** The pinned section above every folder: always expanded, not collapsible. */
+  pinnedSection?: boolean
   /** Visible session rows (empty while the group is folded). */
   sessions: readonly SessionNode[]
 }
@@ -80,6 +87,8 @@ export interface TreeView {
   expandedGroups: readonly string[]
   /** Browser-local order for Sessions without a backing Workspace account. */
   ungroupedOrder?: readonly string[]
+  /** Pinned Session ids: pinned rows float to the top of their group (stable partition). */
+  pinnedSessionIds?: readonly string[]
 }
 
 interface Group {
@@ -211,9 +220,30 @@ function groupByWorkspace(
   return groups
 }
 
+/**
+ * Stable partition: pinned items first, each side keeping its input order.
+ * The flat list uses it to float pinned rows without rewriting the persisted
+ * order account, so unpinning restores the exact prior arrangement.
+ * @param items - rows in their account/recency order.
+ * @param pinned - pinned Session id set.
+ * @returns pinned rows followed by the rest, both in input order.
+ */
+export function partitionPinned<T extends { id: SessionId }>(
+  items: readonly T[],
+  pinned: ReadonlySet<string>,
+): T[] {
+  const pinnedItems: T[] = []
+  const rest: T[] = []
+  for (const item of items) {
+    (pinned.has(item.id as string) ? pinnedItems : rest).push(item)
+  }
+  return [...pinnedItems, ...rest]
+}
+
 function sessionNode(
   s: SessionSummary,
   descendants: ReadonlyMap<SessionId, SubagentDescendantSummary>,
+  pinned: boolean,
 ): SessionNode {
   return {
     id: s.id,
@@ -223,6 +253,7 @@ function sessionNode(
     runningSubagentCount: descendants.get(s.id)?.runningCount ?? 0,
     completed: s.completed === true,
     updatedAt: s.updatedAt,
+    pinned,
     ...(s.pendingInteraction === undefined ? {} : { pendingInteraction: s.pendingInteraction }),
   }
 }
@@ -230,16 +261,17 @@ function sessionNode(
 /**
  * Derive the workspace browser groups with every session as a top-level row.
  *
- * Every group shows; sessions populate under expanded groups in the selected
- * local order. Blank sessions are excluded except for the selected
- * provisional New Session row; archived sessions are excluded everywhere.
- * Content search lives outside this derivation
+ * Pinned Sessions leave their folder and surface once in a dedicated pinned
+ * section ABOVE every folder (recency order); every folder keeps the account
+ * order of its remaining rows. Blank sessions are excluded except for the
+ * selected provisional New Session row; archived sessions are excluded
+ * everywhere. Content search lives outside this derivation
  * (see {@link deriveSearchResults}).
  * @param list - sessions list snapshot (`current` feeds containsCurrent).
  * @param workspaces - real workspaces in stable Host order.
  * @param archivedSessionIds - registry-global archive set.
- * @param view - local expansion arrays.
- * @returns group sections in render order.
+ * @param view - local expansion arrays and the pinned Session id set.
+ * @returns group sections in render order (pinned section first when present).
  */
 export function deriveGroups(
   list: SessionListState,
@@ -249,24 +281,52 @@ export function deriveGroups(
 ): GroupNode[] {
   const archived = new Set(archivedSessionIds)
   const expandedGroups = new Set(view.expandedGroups)
+  const pinned = new Set(view.pinnedSessionIds ?? [])
   const descendants = indexSubagentDescendants(list.byId)
   const currentGroup = list.current === undefined
     ? undefined
     : (workspaces.find(w => w.sessionIds.includes(list.current as SessionId))?.workspaceId as string | undefined)
         ?? UNGROUPED_KEY
   const groups: GroupNode[] = []
+  const pinnedMembers: SessionSummary[] = []
   for (const g of groupByWorkspace(list, workspaces, archived, view.ungroupedOrder)) {
     const expanded = expandedGroups.has(g.key)
+    // Pinned Sessions are pulled out of their folder; the folder renders the
+    // rest in the account order. The Ungrouped bucket dissolves when its last
+    // member moves to the pinned section; empty Workspaces still show.
+    const members: SessionSummary[] = []
+    for (const session of g.sessions) {
+      if (pinned.has(session.id as string)) pinnedMembers.push(session)
+      else members.push(session)
+    }
+    if (g.key === UNGROUPED_KEY && members.length === 0) continue
     groups.push({
       key: g.key,
       workspaceId: g.workspaceId,
       cwd: g.cwd,
       createdAt: g.createdAt,
       label: g.label,
-      sessionCount: g.sessions.length,
+      sessionCount: members.length,
       expanded,
       containsCurrent: g.key === currentGroup,
-      sessions: expanded ? g.sessions.map(session => sessionNode(session, descendants)) : [],
+      sessions: expanded ? members.map(session => sessionNode(session, descendants, false)) : [],
+    })
+  }
+  if (pinnedMembers.length > 0) {
+    // Cross-folder pinned rows have no shared account order: recency leads,
+    // newest update first with the id tiebreak (same as the flat list).
+    pinnedMembers.sort(byRecency)
+    groups.unshift({
+      key: PINNED_KEY,
+      workspaceId: undefined,
+      cwd: undefined,
+      createdAt: undefined,
+      label: 'Pinned', // the renderer substitutes the localized label
+      sessionCount: pinnedMembers.length,
+      expanded: true,
+      containsCurrent: false,
+      pinnedSection: true,
+      sessions: pinnedMembers.map(session => sessionNode(session, descendants, true)),
     })
   }
   return groups
@@ -294,7 +354,9 @@ export function deriveFlat(
     rows.push(s)
   }
   rows.sort(byRecency)
-  return rows.map(session => sessionNode(session, descendants))
+  // Pinned flags are unknown here (pins live in the browser view store); the
+  // flat list owner attaches them and partitions after its account reconcile.
+  return rows.map(session => sessionNode(session, descendants, false))
 }
 
 /** Relative-time bucket of a session row's trailing label. */

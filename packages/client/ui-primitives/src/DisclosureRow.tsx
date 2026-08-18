@@ -12,7 +12,8 @@ export interface DisclosureRowProps {
   onToggle: () => void
   /** Makes the complete title row the disclosure target. */
   expandOnRowClick?: boolean | undefined
-  /** Replaces the collapsed icon with a chevron while the row is hovered. */
+  /** Reveals the overlay chevron on hover while collapsed (pointing down);
+   *  the chevron still appears and points up while open regardless. */
   previewChevron?: boolean | undefined
   /** Keeps `collapsedContent` inline while open. */
   keepContentWhenOpen?: boolean | undefined
@@ -57,17 +58,24 @@ export function DisclosureRow({
     event.preventDefault()
     onToggle()
   }
-  const collapsedLeading = previewChevron
-    ? (
-      <>
-        <span className={css.iconIdle}>{icon}</span>
-        <IconChevronDownOutline14 className={clsx(chevronClassName, css.chevronHover)} />
-      </>
-    )
-    : icon
-  const leading = open
-    ? <IconChevronDownOutline14 className={chevronClassName} />
-    : collapsedLeading
+  // The leading slot keeps the caller's icon in every state so the row's
+  // identity and run-state semantic stay visible even while expanded. The
+  // chevron is a pointer-events-none overlay: hidden at rest, revealed on
+  // hover (pointing down) and while open (rotated to point up), so an
+  // expanded row communicates its open state without dropping the icon.
+  const leading = (
+    <>
+      <span className={css.iconIdle}>{icon}</span>
+      {expandable && (
+        <span
+          className={css.chevronSlot}
+          data-row-chevron={previewChevron ? 'preview' : undefined}
+        >
+          <IconChevronDownOutline14 className={clsx(chevronClassName, css.chevron)} />
+        </span>
+      )}
+    </>
+  )
 
   return (
     <div className={clsx(css.root, className)} data-open={open || undefined}>

@@ -171,6 +171,37 @@
   gap: 2px;
 }
 
+/* Pinned-section header above every folder: same height rhythm as a folder
+   row but static (no hover fill, no chevron, no actions). The pin glyph AND
+   the section label ride the DeepSeek brand blue. */
+.pinnedHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 8px;
+  border-radius: 8px;
+  color: var(--dsw-static-deepseek-500);
+  user-select: none;
+}
+
+/* The shared .slot class paints tertiary grey on its own span, which would
+   override the inherited header color for the pin glyph — the pin must ride
+   the DeepSeek brand blue instead. */
+.pinnedHeader .slot {
+  color: inherit;
+}
+
+.pinnedHeaderTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--dsw-static-deepseek-500);
+}
+
 .title {
   min-width: 0;
   overflow: hidden;
@@ -225,10 +256,26 @@
   gap: 12px;
 }
 
+/* The pin toggle rides beside the row menu: hover-revealed, for UNPINNED
+   rows only (pinned rows keep no trailing pin control at all — a hover
+   appears ellipsis would shove it sideways). The small margin keeps the pin
+   and the ellipsis from touching. */
+.pinAction {
+  flex: none;
+  display: none;
+  align-items: center;
+  margin-right: 6px;
+}
+
 .projectRow:hover .rowActions,
 .sessionRow:hover .rowActions,
 .projectRow.menuOpen .rowActions,
 .sessionRow.menuOpen .rowActions {
+  display: inline-flex;
+}
+
+.sessionRow:hover .pinAction,
+.sessionRow.menuOpen .pinAction {
   display: inline-flex;
 }
 
@@ -339,6 +386,13 @@
 
 .iconButton:hover {
   color: var(--dsw-alias-label-primary);
+}
+
+/* Pinned pin: DeepSeek brand blue. Sits after .iconButton so the
+   same-specificity iconButton grey cannot win the cascade (it did before —
+   the pinned pin rendered grey). */
+.sessionRow .pinActive {
+  color: var(--dsw-static-deepseek-500);
 }
 
 /* Chevrons ride the caption grey (#ADB2B8); the folder glyph stays one step

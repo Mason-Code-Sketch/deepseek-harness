@@ -9,6 +9,10 @@
   height: 100%;
   min-width: 0;
   background: var(--dsw-alias-bg-base);
+  /* The conversation bar is 30% narrower than the shared 8px theme bar.
+     Keep the local mirror aligned with the WebKit rule below so the overlay
+     composer seat compensates for the actual conversation gutter. */
+  --dsh-conversation-scrollbar-width: calc(var(--dsh-scrollbar-width) * 0.7);
 
   /* Shared width axis for the whole column: one content width W
      (--dsh-chat-content-width) for the transcript, the dock cards
@@ -228,6 +232,9 @@
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior-y: none;
+  /* 8px × 70%: keep the right conversation bar compact without changing the
+     workspace sidebar's scrollbar geometry. */
   /* The column scrolls on ONE axis. Stating `hidden` rather than leaving the
      initial `visible` is what removes the horizontal bar: a box that scrolls in
      one axis computes `visible` to `auto` in the other, so any bleed becomes
@@ -241,6 +248,10 @@
      gutter moves the input card sideways by the bar's width whenever the two
      differ ([decision](../../../../../../.agents/notes/implemented/bug-fix/2026-08-04-composer-tab-gutter-reservation.md)). */
   scrollbar-gutter: stable;
+}
+
+.scrollBody::-webkit-scrollbar {
+  width: 5.6px;
 }
 
 .root[data-phase='active'] .viewArea {
@@ -296,12 +307,12 @@
   /* Chat's seat rides this box's content box, which its own scrolling shortens
      by the bar's width; the overlay seat is against the padding box, so it
      must give back the same width to keep the input card in place across
-     tabs. Reads ui-theme's --dsh-scrollbar-width, which mirrors the WebKit
-     bar's layout width. Chat reserves the engine-resolved width, so on an
-     engine where the resolved width differs from this fixed 8px the card
-     drifts by half the difference — accepted residual risk, recorded in
+     tabs. This local variable mirrors the WebKit bar's layout width. Chat
+     reserves the engine-resolved width, so on an engine where the resolved
+     width differs from this fixed value the card drifts by half the
+     difference, an accepted residual risk recorded in
      ([decision](../../../../../../.agents/notes/implemented/bug-fix/2026-08-12-composer-overlay-seat-width-compensation.md)). */
-  right: var(--dsh-scrollbar-width);
+  right: var(--dsh-conversation-scrollbar-width);
   bottom: 0;
   left: 0;
 }

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, createEvent, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-web-react'
 import type {
   SessionId, SessionListState, SessionSummary, WorkspaceId, WorkspaceListState, WorkspaceView,
@@ -312,6 +312,57 @@ describe('WorkspaceBrowser', () => {
     })
     expect(restored.store.getSnapshot().sessionOrderByAccount.alpha).toEqual(['two', 'one'])
     expect(screen.getAllByRole('treeitem').slice(1)[0]?.textContent).toContain('two')
+  })
+
+  it('pins a session into the section above every folder, persisting across remounts', async () => {
+    const sessions = sessionState([summary('one', 3), summary('two', 1)])
+    const b = mount({
+      useSessions: hook(sessions),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['one', 'two'])])),
+    })
+    fireEvent.click(screen.getByText('alpha'))
+    expect(screen.getAllByRole('treeitem').slice(1)[0]?.textContent).toContain('one')
+
+    // Pin the folder row: it leaves the folder and surfaces above it in the
+    // pinned section (header first, then the pinned row, then the folder).
+    const folderRow = screen.getAllByRole('treeitem').slice(1)[1] as HTMLElement
+    fireEvent.click(within(folderRow).getByRole('button', { name: '置顶会话' }))
+    expect(b.store.getSnapshot().pinnedSessionIds).toEqual(['two'])
+    const items = screen.getAllByRole('treeitem')
+    expect(items[0]?.textContent).toContain('置顶')
+    expect(items[1]?.textContent).toContain('two')
+    expect(items[2]?.textContent).toContain('alpha')
+    expect(items[3]?.textContent).toContain('one')
+    expect(screen.queryByText('two')).toBeTruthy()
+    // Pinned rows show the same hover pin button, brand blue: clicking it
+    // unpins and the row returns to its folder at the account position.
+    fireEvent.click(within(items[1] as HTMLElement).getByRole('button', { name: '取消置顶' }))
+    expect(b.store.getSnapshot().pinnedSessionIds).toEqual([])
+    const restored = screen.getAllByRole('treeitem').slice(1)
+    expect(restored[0]?.textContent).toContain('one')
+    expect(restored[1]?.textContent).toContain('two')
+
+    // Re-pin and switch to the flat list: pinned rows float to the top there.
+    fireEvent.click(within(screen.getAllByRole('treeitem').slice(1)[1] as HTMLElement).getByRole('button', { name: '置顶会话' }))
+    fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '单列表' }))
+    expect(screen.getAllByRole('treeitem')[0]?.textContent).toContain('two')
+
+    // Pins live in the persisted view store: a fresh mount rehydrates them.
+    // The persisted groupBy is flat, so the pinned row floats to the top there.
+    b.view.unmount()
+    const remounted = mount({
+      useSessions: hook(sessions),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['one', 'two'])])),
+    })
+    expect(remounted.store.getSnapshot().pinnedSessionIds).toEqual(['two'])
+    expect(screen.getAllByRole('treeitem')[0]?.textContent).toContain('two')
+    // Back in the grouped view the pinned section sits above the folder.
+    fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '按工作区' }))
+    const remountedItems = screen.getAllByRole('treeitem')
+    expect(remountedItems[1]?.textContent).toContain('two')
+    expect(remountedItems[3]?.textContent).toContain('one')
   })
 
   it('archives a session from the row menu and hides archived rows in both modes', async () => {

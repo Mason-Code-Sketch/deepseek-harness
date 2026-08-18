@@ -870,3 +870,24 @@ export const IconArchiveOutline20 = ({ size = 20, className }: IconProps) => (
     <path d="M12.7962 12.5661V11.0832H7.20548V12.5661L12.7962 12.5661Z" fill="currentColor" />
   </svg>
 )
+
+/**
+ * ic_ds_pin_outline_16 (lucide Pin, clockwise 45°): the pushpin glyph the
+ * Codex/ChatGPT desktop app ships for thread pinning — stroke-based, rotated
+ * 45° clockwise around the 24x24 center. One glyph covers both toggle states;
+ * the pinned state is colored through the row's pinActive class.
+ */
+export const IconPinOutline16 = ({ size = 16, className }: IconProps) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <g
+      transform="rotate(45 12 12)"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 17v5" />
+      <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+    </g>
+  </svg>
+)

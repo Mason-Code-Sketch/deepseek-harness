@@ -214,11 +214,14 @@ describe('ToolRow', () => {
     expect(view.container.querySelector('[aria-expanded]')?.getAttribute('aria-expanded')).toBe('false')
   })
 
-  it('row click expands: chevron leading, summary kept inline, body in the scrolling card', () => {
+  it('row click expands: icon stays as identity, a rotated chevron leads, summary kept inline', () => {
     const view = render(<ToolRow {...rowProps} />)
     fireEvent.click(view.getByRole('button'))
-    expect(view.queryByTestId('tool-icon')).toBeNull()
-    expect(view.container.querySelector('svg')).not.toBeNull()
+    // The tool icon is an identity/state marker and must survive expansion.
+    expect(view.queryByTestId('tool-icon')).not.toBeNull()
+    // An expandable row always carries the overlay chevron (the open state
+    // reveals + rotates it); the expanded body is present.
+    expect(view.container.querySelector('[class*="chevronSlot"]')).not.toBeNull()
     expect(view.getByText('List files')).toBeTruthy()
     expect(view.getByText(/"a": 1/)).toBeTruthy()
     expect(view.container.querySelector('[class*="ioCard"]')).not.toBeNull()
@@ -234,8 +237,8 @@ describe('ToolRow', () => {
     const errorView = render(<ToolRow {...rowProps} state="error" />)
     expect(errorView.container.querySelector('[data-testid="tool-icon"]')).toBeNull()
     // The dot rides the idle slot, so an expandable error row keeps the
-    // icon→chevron hover preview instead of losing it with the icon.
-    expect(errorView.container.querySelector('[class*="chevronHover"]')).not.toBeNull()
+    // overlay chevron affordance instead of losing it with the icon.
+    expect(errorView.container.querySelector('[class*="chevronSlot"]')).not.toBeNull()
   })
 
   it('non-expandable rows render a passive leading slot and no row button', () => {

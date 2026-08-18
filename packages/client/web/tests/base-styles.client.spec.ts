@@ -63,4 +63,9 @@ describe('web shell base.css', () => {
     expect(platform).toBeGreaterThanOrEqual(0)
     expect(scrollbar).toBeGreaterThan(platform)
   })
+
+  it('locks horizontal viewport movement while leaving vertical scrolling available', () => {
+    expect(baseCss).toMatch(/html,[\s\S]*body,[\s\S]*#root[\s\S]*overflow-x:\s*hidden/)
+    expect(baseCss).toMatch(/html,[\s\S]*body,[\s\S]*#root[\s\S]*overscroll-behavior-x:\s*none/)
+  })
 })

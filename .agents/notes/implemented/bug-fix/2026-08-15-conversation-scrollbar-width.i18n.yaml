@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-15-conversation-scrollbar-width.md
+2026-08-15-conversation-scrollbar-width.md: 1d1f436529ae332a09a1ccd8fddbedc765f25235
+2026-08-15-conversation-scrollbar-width.zh.md: 58a0421c6acf5c8f3ecffdf70383ab237d696548

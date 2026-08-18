@@ -9,8 +9,9 @@ import { useState } from 'react'
 import clsx from 'clsx'
 import {
   HoverCard, IconArchiveOutline20, IconBranchOutline16, IconEditOutline16,
-  IconEllipsisOutline16, IconFolderClose16, IconFolderOpen16, IconPlusOutline16,
-  IconTrashOutline16, IconTriangleRightFill14, Menu, StateDot,
+  IconEllipsisOutline16, IconFolderClose16, IconFolderOpen16, IconPinOutline16,
+  IconPlusOutline16, IconTrashOutline16, IconTriangleRightFill14,
+  Menu, StateDot,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { WorkspaceBrowserProps } from '../contract/slots.ts'
@@ -93,6 +94,24 @@ interface WorkspaceRowDragProps {
 function rowHalf(e: { clientY: number; currentTarget: HTMLElement }): 'before' | 'after' {
   const rect = e.currentTarget.getBoundingClientRect()
   return e.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+}
+
+/**
+ * Pinned-section header: pin glyph + the localized section label, rendered
+ * above every Workspace folder. Static by design — the pinned section is
+ * always expanded and never reordered by drag.
+ * @param props.t - the browser root's locale seat.
+ * @returns the section header element.
+ */
+export function PinnedSectionHeader({ t }: { t: RowTranslate }) {
+  return (
+    <div className={css.pinnedHeader} role="treeitem" aria-expanded="true">
+      <span className={css.slot}>
+        <IconPinOutline16 />
+      </span>
+      <span className={css.pinnedHeaderTitle}>{t('group.pinned')}</span>
+    </div>
+  )
 }
 
 /**
@@ -345,12 +364,13 @@ export function SearchResultItem({ result, currentId, onOpen, t }: {
  * @param props.onRename - open the session rename dialog (id + current title).
  * @param props.onFork - fork a session at its last completed turn.
  * @param props.onArchive - archive a session by id.
+ * @param props.onTogglePin - toggle the session's pinned state (row action button).
  * @param props.drag - optional draggable-row wiring.
  * @param props.flat - omit the empty status slot in the hierarchy-free flat list.
  * @param props.t - the browser root's locale seat.
  * @returns the session row.
  */
-export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork, onArchive, drag, flat = false, t }: {
+export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork, onArchive, onTogglePin, drag, flat = false, t }: {
   node: SessionNode
   currentId: string | undefined
   now: number
@@ -361,6 +381,8 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
   onFork: (id: SessionNode['id']) => void
   /** Archive this session (row menu action; commits without a dialog). */
   onArchive: (id: SessionNode['id']) => void
+  /** Toggle this session's pinned state (row action button; absent rows show no pin control). */
+  onTogglePin?: ((id: SessionNode['id']) => void) | undefined
   /** Present only on draggable rows (workspace-group sessions outside search). */
   drag?: RowDragProps | undefined
   /** The row is rendered without a parent Workspace header. */
@@ -433,6 +455,22 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
           (rename/fork/archive) would all act on content that does not
           exist — both trailing cells stay off until the first prompt. */}
       {!row.blank && <span className={css.time}>{timeLabel(row.updatedAt, now, t)}</span>}
+      {/* One hover-revealed pin button for every row, exactly like the menu:
+          grey to pin an unpinned row, brand blue to unpin a pinned one. Both
+          buttons surface together, so nothing shoves the pin sideways. */}
+      {!row.blank && onTogglePin !== undefined && (
+        <span className={css.pinAction}>
+          <button
+            type="button"
+            className={clsx(css.iconButton, node.pinned && css.pinActive)}
+            aria-label={node.pinned ? t('menu.unpin') : t('menu.pin')}
+            aria-pressed={node.pinned}
+            onClick={(e) => { e.stopPropagation(); onTogglePin(node.id) }}
+          >
+            <IconPinOutline16 />
+          </button>
+        </span>
+      )}
       {!row.blank && (
         <span className={css.rowActions}>
           <Menu

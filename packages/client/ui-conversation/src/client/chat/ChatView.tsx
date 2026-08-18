@@ -172,6 +172,8 @@ export function ChatView({
   const [atBottom, setAtBottom] = useState(true)
   /** Last position delivered or written on the main thread. */
   const observedTopRef = useRef(0)
+  /** Reader-created gap from the physical floor while within the follow threshold. */
+  const readerBottomGapRef = useRef(0)
   /** Paging anchor: semantic row/position at click, updated by reader scrolls
    * while the request is pending and restored after the prepend lands. */
   const anchorRef = useRef<PagingAnchor | null>(null)
@@ -195,6 +197,7 @@ export function ChatView({
     anchorRef.current = null
     el.scrollTop = el.scrollHeight
     observedTopRef.current = el.scrollTop
+    readerBottomGapRef.current = 0
     atBottomRef.current = true
     setAtBottom(true)
     chatScroll.save(null)
@@ -219,6 +222,9 @@ export function ChatView({
         if (row !== null) el.scrollTop += flowTop(row, el) - saved.anchorTop
         observedTopRef.current = el.scrollTop
         const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_THRESHOLD + 1
+        readerBottomGapRef.current = isAtBottom
+          ? Math.max(0, el.scrollHeight - el.scrollTop - el.clientHeight)
+          : 0
         atBottomRef.current = isAtBottom
         setAtBottom(isAtBottom)
         const normalized = isAtBottom ? null : scrollPosition(local, el)
@@ -258,7 +264,8 @@ export function ChatView({
     followSigRef.current = followSig
     // Follow new flow content while pinned; do NOT re-pin on every render
     // merely because atBottomRef is true (scroll threshold → setState → snap).
-    if (appendedUser || appendedSteering || (tipMoved && atBottomRef.current)) toBottom(el)
+    const canFollowFlow = atBottomRef.current && readerBottomGapRef.current <= 1
+    if (appendedUser || appendedSteering || (tipMoved && canFollowFlow)) toBottom(el)
   })
 
   const onScrollRef = useRef(() => {})
@@ -279,10 +286,11 @@ export function ChatView({
     const isAtBottom = movedByReader
       ? floor - el.scrollTop <= FOLLOW_THRESHOLD + 1
       : atBottomRef.current
-    if (!movedByReader && isAtBottom) {
+    if (!movedByReader && isAtBottom && readerBottomGapRef.current <= 1) {
       toBottom(el)
       return
     }
+    readerBottomGapRef.current = isAtBottom ? Math.max(0, floor - el.scrollTop) : 0
     atBottomRef.current = isAtBottom
     setAtBottom(isAtBottom)
     const position = isAtBottom ? null : scrollPosition(local, el)
@@ -318,10 +326,14 @@ export function ChatView({
   const followRef = useRef<(() => void) | null>(null)
   followRef.current = () => {
     const local = listRef.current
-    if (local !== null && atBottomRef.current) {
+    if (local !== null) {
       const el = scrollerOf(local)
+      const floor = Math.max(0, el.scrollHeight - el.clientHeight)
+      const pendingReaderMove = Math.abs(el.scrollTop - Math.min(observedTopRef.current, floor)) > 0.5
+      if (!atBottomRef.current || readerBottomGapRef.current > 1 || pendingReaderMove) return
       el.scrollTop = el.scrollHeight
       observedTopRef.current = el.scrollTop
+      readerBottomGapRef.current = 0
       chatScroll.save(null)
     }
   }

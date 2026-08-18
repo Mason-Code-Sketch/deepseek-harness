@@ -1108,6 +1108,33 @@ describe('ChatView', () => {
     expect(scroller.scrollTop).toBe(690)
   })
 
+  it('does not snap a threshold scroll on a duplicate delivery or flow growth', () => {
+    let notify: (() => void) | undefined
+    class ResizeObserverStub {
+      constructor(callback: ResizeObserverCallback) {
+        notify = () => { callback([], this as unknown as ResizeObserver) }
+      }
+
+      observe = vi.fn()
+      disconnect = vi.fn()
+    }
+    vi.stubGlobal('ResizeObserver', ResizeObserverStub)
+    const h = makeHarness({ nodes: [user(1, 'q'), assistant(2, 'a')] })
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+    Object.defineProperty(scroller, 'scrollHeight', { value: 1000, writable: true })
+    Object.defineProperty(scroller, 'clientHeight', { value: 300, writable: true })
+
+    readerScroll(scroller, 690)
+    fireEvent.scroll(scroller)
+    expect(scroller.scrollTop).toBe(690)
+
+    Object.defineProperty(scroller, 'scrollHeight', { value: 1100, writable: true })
+    act(() => { notify?.() })
+    expect(scroller.scrollTop).toBe(690)
+    view.unmount()
+  })
+
   it('under data-conversation-scroll, bottom-follow targets the host scrollport', () => {
     const host = document.createElement('div')
     host.setAttribute('data-conversation-scroll', '')

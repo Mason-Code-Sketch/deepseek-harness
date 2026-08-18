@@ -1,0 +1,43 @@
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  background: var(--dsw-alias-bg-layer-1);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.pill:hover {
+  border-color: var(--dsw-alias-border-l2);
+}
+
+.pillName {
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+
+.pillNum {
+  font-weight: 600;
+}
+
+.window {
+  white-space: nowrap;
+}
+
+/* 余额与用量数字统一使用 DSH 重点色（品牌浅蓝），随明暗主题自动切换。 */
+.accent {
+  color: var(
+    --dsw-alias-brand-primary-new-colorprimary-new-color,
+    rgb(65, 118, 230)
+  ) !important;
+}
+
+.pillError {
+  color: var(--dsw-alias-state-error-primary);
+}

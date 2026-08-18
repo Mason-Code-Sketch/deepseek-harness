@@ -4,7 +4,7 @@ import type {
 } from '@deepseek-ai/dsh-client-runtime/client'
 import {
   deriveFlat, deriveGroups, deriveSearchResults, workspaceLabel, relativeTime,
-  UNGROUPED_KEY, UNGROUPED_LABEL,
+  PINNED_KEY, UNGROUPED_KEY, UNGROUPED_LABEL,
 } from '../src/client/tree.ts'
 import { createWorkspaceViewStore } from '../src/client/stores.ts'
 
@@ -202,6 +202,74 @@ describe('deriveGroups', () => {
     expect(ownedGroups.find(group => group.key === 'project')!.containsCurrent).toBe(true)
     const looseGroups = deriveGroups({ ...list(owned, loose), current: loose.id }, [ws], noArchive, view())
     expect(looseGroups.find(group => group.key === UNGROUPED_KEY)!.containsCurrent).toBe(true)
+  })
+
+  it('moves pinned Sessions out of their folder into a pinned section above every folder', () => {
+    const sessions = list(summary('older', 1), summary('pinned-b', 2), summary('newer', 3), summary('pinned-a', 4))
+    const groups = deriveGroups(
+      sessions,
+      [workspace('first', ['older', 'pinned-b', 'newer', 'pinned-a'])],
+      noArchive,
+      { expandedGroups: ['first'], pinnedSessionIds: ['pinned-a', 'pinned-b'] },
+    )
+    // The pinned section leads; its rows follow recency (newest first).
+    expect(groups.map(group => group.key)).toEqual([PINNED_KEY, 'first'])
+    expect(groups[0]!.pinnedSection).toBe(true)
+    expect(groups[0]!.sessions.map(node => node.id)).toEqual([sid('pinned-a'), sid('pinned-b')])
+    expect(groups[0]!.sessions.map(node => node.pinned)).toEqual([true, true])
+    expect(groups[0]!.sessionCount).toBe(2)
+    // The folder keeps the account order of its remaining rows and its count
+    // follows the visible rows (pinned moved out).
+    expect(groups[1]!.sessions.map(node => node.id)).toEqual([sid('older'), sid('newer')])
+    expect(groups[1]!.sessions.every(node => node.pinned === false)).toBe(true)
+    expect(groups[1]!.sessionCount).toBe(2)
+  })
+
+  it('collects pinned Sessions across folders and ungrouped into one recency-ordered section', () => {
+    const sessions = list(
+      summary('in-ws-old', 1), summary('in-ws-new', 5),
+      summary('loose-pinned', 3), summary('loose-plain', 2),
+    )
+    const groups = deriveGroups(
+      sessions,
+      [workspace('alpha', ['in-ws-old', 'in-ws-new'])],
+      noArchive,
+      {
+        expandedGroups: ['alpha', UNGROUPED_KEY],
+        pinnedSessionIds: ['in-ws-old', 'loose-pinned'],
+      },
+    )
+    expect(groups.map(group => group.key)).toEqual([PINNED_KEY, 'alpha', UNGROUPED_KEY])
+    // Pinned section: recency across both origins.
+    expect(groups[0]!.sessions.map(node => node.id)).toEqual([sid('loose-pinned'), sid('in-ws-old')])
+    expect(groups[1]!.sessions.map(node => node.id)).toEqual([sid('in-ws-new')])
+    // The ungrouped bucket keeps its remaining loose member.
+    expect(groups[2]!.sessions.map(node => node.id)).toEqual([sid('loose-plain')])
+  })
+
+  it('dissolves the Ungrouped bucket when every loose member is pinned', () => {
+    const sessions = list(summary('loose-a', 1), summary('loose-b', 2), summary('stray', 3))
+    const groups = deriveGroups(
+      sessions,
+      [],
+      noArchive,
+      { expandedGroups: [UNGROUPED_KEY], pinnedSessionIds: ['stray', 'loose-b', 'loose-a'] },
+    )
+    expect(groups.map(group => group.key)).toEqual([PINNED_KEY])
+    expect(groups[0]!.sessions.map(node => node.id)).toEqual([sid('stray'), sid('loose-b'), sid('loose-a')])
+  })
+
+  it('leaves unpinned orders untouched when no pins are supplied', () => {
+    const sessions = list(summary('one', 1), summary('two', 2))
+    const groups = deriveGroups(
+      sessions,
+      [workspace('first', ['one', 'two'])],
+      noArchive,
+      view(['first']),
+    )
+    expect(groups.map(group => group.key)).toEqual(['first'])
+    expect(groups[0]!.sessions.map(node => node.id)).toEqual([sid('one'), sid('two')])
+    expect(groups[0]!.sessions.every(node => node.pinned === false)).toBe(true)
   })
 })
 
@@ -424,6 +492,33 @@ describe('createWorkspaceViewStore', () => {
     expect(snapshot.groupExpansion).toEqual({ '': true, alpha: true })
     expect(snapshot.sessionOrderByAccount).toEqual({ alpha: ['alpha-session'] })
     expect(snapshot.sessionUpdatedAtByAccount).toEqual({ alpha: { 'alpha-session': 2 } })
+  })
+
+  it('toggles Session pins and prunes pins for Sessions the registry no longer lists', () => {
+    const store = createWorkspaceViewStore().create()
+    expect(store.getSnapshot().pinnedSessionIds).toEqual([])
+    store.actions.toggleSessionPinned('one')
+    store.actions.toggleSessionPinned('two')
+    store.actions.toggleSessionPinned('one')
+    expect(store.getSnapshot().pinnedSessionIds).toEqual(['two'])
+    store.actions.retainPinnedSessions(['two', 'three'])
+    expect(store.getSnapshot().pinnedSessionIds).toEqual(['two'])
+  })
+
+  it('tolerates pre-pin persisted snapshots rehydrated without the field', () => {
+    const store = createWorkspaceViewStore().create()
+    store.store.set({
+      groupBy: 'workspace',
+      orderBy: 'updated',
+      groupExpansion: {},
+      sessionOrderByAccount: {},
+      sessionUpdatedAtByAccount: {},
+      // pinnedSessionIds absent — the pre-pin v5 localStorage shape.
+    } as never)
+    store.actions.toggleSessionPinned('one')
+    expect(store.getSnapshot().pinnedSessionIds).toEqual(['one'])
+    store.actions.retainPinnedSessions(['missing'])
+    expect(store.getSnapshot().pinnedSessionIds).toEqual([])
   })
 })
 

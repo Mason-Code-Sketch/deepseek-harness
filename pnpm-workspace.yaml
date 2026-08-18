@@ -24,6 +24,11 @@ packages:
 # builds must resolve those matching names to this workspace's pinned sources.
 linkWorkspacePackages: true
 
+# Registry links on dev machines can sit around 250 KB/s; the 60s default
+# fetchTimeout kills downloads of large binary tarballs (e.g. @openai/codex
+# at ~111 MB, which needs ~8 minutes at that speed). 15 minutes is the ceiling.
+fetchTimeout: 900000
+
 overrides:
   '@deepseek-ai/cosmokit': 'link:vendor/cosmokit'
   '@deepseek-ai/schemastery': 'link:vendor/schemastery'
