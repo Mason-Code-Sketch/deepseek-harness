@@ -6,20 +6,36 @@
  * input on a bold single line, the assistant reply below clamped to three
  * lines — and clicking scrolls the conversation so the message sits just
  * below the top edge.
+ *
+ * Data access follows the current Session-Controller architecture: the
+ * current binding's `conversation` standard hook (published by ui-conversation
+ * through uiSession) is a snapshot store over the neutral Conversation
+ * snapshot; the Chat target view holds the ordered node store this rail reads.
  */
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ConversationSnapshot, SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
-import type { SessionId } from '@deepseek-ai/dsh-client-connection/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import { useSyncExternalStore } from 'react'
 // Type-only: pulls the shell.overlay slot declaration (ui-layout) into this program.
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type { ConversationSnapshot } from '@deepseek-ai/dsh-client-ui-conversation/client'
+// Type-only: pulls the `chat` view-target augmentation into the program.
+import type { ChatSnapshot } from '@deepseek-ai/dsh-client-ui-chat/client'
 import { createElement, Fragment, useLayoutEffect, useMemo, useRef, useState, useEffect } from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 
-/** Required services: the slot registry plus the session list/service face. */
-export const inject = ['slots', 'sessions']
+/** Required services: the slot registry plus the session binding adapter. */
+export const inject = ['slots', 'uiSession']
 
 /** Stable Cordis plugin name (also the injected style tag's owner marker). */
 export const name = 'ui-msg-rail'
+
+/** Minimal observable snapshot contract (matches HostObservable / SnapshotStore). */
+interface SnapshotSource<T> {
+  getSnapshot(): T
+  subscribe(listener: () => void): () => void
+}
+
+/** The conversation standard hook published on the current session binding. */
+type ConversationHook = SnapshotSource<ConversationSnapshot> | undefined
 
 const CSS = `
 .msg-rail {
@@ -173,11 +189,11 @@ function jumpTo(key: string): void {
   }
 }
 
-/** Chat node shape read off the conversation snapshot (narrowed defensively). */
+/** Chat node shape read off the Chat snapshot (narrowed defensively). */
 interface ChatNodeLike {
   readonly kind?: unknown
   readonly visibility?: unknown
-  readonly data?: unknown
+  readonly data?: { readonly content?: unknown; readonly blocks?: unknown }
 }
 
 /** Extract plain text from content blocks (text blocks only; both wire vocabularies). */
@@ -208,30 +224,48 @@ export function apply(ctx: ClientContext): void {
   document.head.appendChild(tag)
   ctx.effect(() => () => tag.remove())
 
-  const sessions = ctx.sessions
+  const uiSession = ctx.uiSession
 
-  function MsgRail({ useSessions }: {
-    useSessions: (selector: (state: SessionListState) => SessionId | undefined) => SessionId | undefined
-  }) {
-    const currentId = useSessions(s => s.current)
-    const [snapshot, setSnapshot] = useState<ConversationSnapshot | null>(null)
+  /**
+   * Subscribe to the neutral Conversation snapshot of the current session:
+   * the binding follows `uiSession.adapter.current`, and its `conversation`
+   * standard hook (published by ui-conversation) republishes on every chat
+   * view change, so a single store drives both session switches and live
+   * message growth.
+   */
+  function useConversationSnapshot(): ConversationSnapshot | null {
+    return useSyncExternalStore(
+      (onStoreChange) => {
+        let conversation: ConversationHook
+        const disposers: Array<() => void> = []
+        const rebind = (): void => {
+          const binding = uiSession.adapter.current.getSnapshot()
+          const next = binding?.hooks?.['conversation'] as ConversationHook
+          if (next === conversation) return
+          for (const dispose of disposers.splice(0)) dispose()
+          conversation = next
+          if (conversation !== undefined) disposers.push(conversation.subscribe(onStoreChange))
+          onStoreChange()
+        }
+        disposers.push(uiSession.adapter.current.subscribe(rebind))
+        rebind()
+        return () => { for (const dispose of disposers.splice(0)) dispose() }
+      },
+      () => {
+        const binding = uiSession.adapter.current.getSnapshot()
+        const conversation = binding?.hooks?.['conversation'] as ConversationHook
+        return conversation?.getSnapshot() ?? null
+      },
+    )
+  }
+
+  function MsgRail() {
+    const conversation = useConversationSnapshot()
+    const chat: ChatSnapshot | undefined = conversation === null
+      ? undefined
+      : conversation.views.get('chat')
     const [tip, setTip] = useState<{ left: number; top: number; item: RailItem } | null>(null)
     const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
-
-    useEffect(() => {
-      if (currentId === undefined) {
-        setSnapshot(null)
-        return
-      }
-      const face = sessions.binding(currentId)?.session
-      if (face === undefined) {
-        setSnapshot(null)
-        return
-      }
-      const update = () => setSnapshot(face.getSnapshot())
-      update()
-      return face.subscribe(update)
-    }, [currentId])
 
     useEffect(() => {
       const measure = () => {
@@ -258,17 +292,15 @@ export function apply(ctx: ClientContext): void {
     }, [])
 
     const items = useMemo<RailItem[]>(() => {
-      if (snapshot === null) return []
-      const order = snapshot.chat.order
+      if (chat === undefined) return []
+      const order = chat.order
       const out: RailItem[] = []
       for (let i = 0; i < order.length; i++) {
         const key = order[i]
         if (key === undefined) continue
-        const node = snapshot.chat.nodes.get(key) as ChatNodeLike | undefined
+        const node = chat.nodes.get(key) as ChatNodeLike | undefined
         if (node === undefined || node.kind !== 'user' || node.visibility === 'hidden') continue
-        const data = node.data
-        if (data === undefined || data === null || typeof data !== 'object') continue
-        const content = (data as { content?: unknown }).content
+        const content = node.data?.content
         if (!Array.isArray(content)) continue
         const text = blockText(content)
         if (text.trim() === '') continue
@@ -276,20 +308,18 @@ export function apply(ctx: ClientContext): void {
         for (let j = i + 1; j < order.length; j++) {
           const nextKey = order[j]
           if (nextKey === undefined) continue
-          const next = snapshot.chat.nodes.get(nextKey) as ChatNodeLike | undefined
+          const next = chat.nodes.get(nextKey) as ChatNodeLike | undefined
           if (next === undefined) continue
           if (next.kind === 'user' || next.kind === 'steering') break
-          if (next.kind !== 'assistant-step') continue
-          const ad = next.data
-          if (ad === null || typeof ad !== 'object') continue
-          const blocks = (ad as { blocks?: unknown }).blocks
+          if (next.kind !== 'assistant') continue
+          const blocks = next.data?.blocks
           if (!Array.isArray(blocks)) continue
           reply = blockText(blocks)
         }
         out.push({ key, text, reply })
       }
       return out
-    }, [snapshot])
+    }, [chat])
 
     if (items.length === 0) return null
 
@@ -340,7 +370,5 @@ export function apply(ctx: ClientContext): void {
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({
     name: 'shell.overlay',
     id: 'user-msg-rail',
-  }, (props: { useSessions: (selector: (state: SessionListState) => SessionId | undefined) => SessionId | undefined }) => (
-    createElement(MsgRail, { useSessions: props.useSessions })
-  )))
+  }, MsgRail))
 }

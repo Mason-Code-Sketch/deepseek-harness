@@ -3,7 +3,7 @@
  * host's `/quota-panel/snapshot` route — the DeepSeek balance pill and the
  * OpenCode Go usage pill (5h / weekly / monthly remaining percents).
  */
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
 // Type-only: pulls the ui-conversation slot declarations (the
 // conversation.session.header.utilities key) into this program.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
