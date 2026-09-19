@@ -86,6 +86,55 @@ describe('Messages request conversion', () => {
     expect(body([assistant([call()]), minimal]).messages[1]?.content[0]).toEqual({ type: 'tool_result', tool_use_id: 'a', content: [] })
   })
 
+  it('drops unrepresentable user blocks and keeps the remaining turn sendable', () => {
+    const degraded: string[] = []
+    const notice = createMessage({
+      role: 'user',
+      source: { kind: 'user' },
+      content: [
+        { type: 'text', text: 'Its closing message:' },
+        { type: 'reasoning', text: 'child chain of thought' },
+        { type: 'text', text: 'the answer' },
+      ],
+    })
+    const history = [user(), assistant([{ type: 'text', text: 'ok' }]), notice]
+    const saved = JSON.stringify(history)
+    const sent = serialize(options({ messages: history }), connection, history, new Map(), () => undefined,
+      (reason) => { degraded.push(reason) })
+    expect(sent.messages.at(-1)).toEqual({
+      role: 'user',
+      content: [{ type: 'text', text: 'Its closing message:' }, { type: 'text', text: 'the answer' }],
+    })
+    expect(degraded).toEqual(['DeepSeek Messages cannot represent reasoning in user or tool-result content; dropped'])
+    expect(JSON.stringify(history)).toBe(saved)
+  })
+
+  it('drops unrepresentable tool-result blocks and keeps the result paired with its call', () => {
+    const degraded: string[] = []
+    const poisoned = result('a', [{ type: 'reasoning', text: 'tool chain of thought' }, { type: 'text', text: 'TERMINAL_OK' }])
+    const history = [user(), assistant([call()]), poisoned]
+    const sent = serialize(options({ messages: history }), connection, history, new Map(), () => undefined,
+      (reason) => { degraded.push(reason) })
+    expect(sent.messages[2]?.content[0]).toEqual({
+      type: 'tool_result', tool_use_id: 'a', content: [{ type: 'text', text: 'TERMINAL_OK' }], is_error: false,
+    })
+    expect(degraded).toHaveLength(1)
+  })
+
+  it('omits a user turn whose blocks are all unrepresentable instead of sending an empty turn', () => {
+    const degraded: string[] = []
+    const notice = createMessage({
+      role: 'user',
+      source: { kind: 'user' },
+      content: [{ type: 'reasoning', text: 'child chain of thought' }],
+    })
+    const history = [user(), assistant([{ type: 'text', text: 'ok' }]), notice]
+    const sent = serialize(options({ messages: history }), connection, history, new Map(), () => undefined,
+      (reason) => { degraded.push(reason) })
+    expect(sent.messages.map(message => message.role)).toEqual(['user', 'assistant'])
+    expect(degraded).toHaveLength(1)
+  })
+
   it('collects leading system text and maps tools, stop sequences and explicit output cap', () => {
     const system = createMessage({ role: 'system', source: { kind: 'plugin', plugin: 'test' }, content: [{ type: 'text', text: 'instructions' }] })
     expect(body([system, user()], { system: 'top', maxTokens: 123, stop: ['END'], tools: [{ name: 'read', description: 'Read a file', parameters: { type: 'object' } }] })).toMatchObject({
@@ -313,7 +362,6 @@ describe('Messages images', () => {
     await expect(prepareImages([assistant([image])], connection, model, attachments, access, signal)).rejects.toMatchObject({ code: 'UNSUPPORTED_CONTENT' })
     expect(() => body([result('a', [image])])).toThrow(/image/)
     expect(() => body([assistant([image])])).toThrow(/assistant/)
-    expect(() => body([result('a', [{ type: 'reasoning', text: 'bad' }])])).toThrow(/user/)
     expect(() => serialize(options({ model }), connection, [result('a', [image])], new Map([[ref.attachmentId, version]]), access, undefined, new Map()))
       .toThrow(/request file id is missing/)
   })

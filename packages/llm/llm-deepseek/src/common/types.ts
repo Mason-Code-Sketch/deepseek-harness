@@ -89,8 +89,8 @@ export interface DeepSeekConnectionOptions {
 
 /** Constructor options for {@link DeepSeekAdapter}: the operation-local resolution hooks the plugin owns. */
 export interface DeepSeekAdapterOptions {
-  /** Report unusable native Messages replay metadata without exposing content or signatures. */
-  onReplayDegrade?: (detail: { provider: string; model: string; reason: string }) => void
+  /** Report history the Messages route sent without its full recorded content; the diagnostic carries no message content or signatures. */
+  onHistoryDegrade?: (detail: { provider: string; model: string; reason: string }) => void
   /** Current validated connection facts; called once per operation. */
   options: () => DeepSeekConnectionOptions
   /**

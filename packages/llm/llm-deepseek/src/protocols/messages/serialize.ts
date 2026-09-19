@@ -23,8 +23,8 @@ function toolInput(raw: string): Record<string, unknown> {
     : {}
 }
 
-function assistant(message: Message, model: string, onReplayDegrade?: (reason: string) => void): WireBlock[] {
-  const replay = readReplay(message, model, onReplayDegrade)
+function assistant(message: Message, model: string, onHistoryDegrade?: (reason: string) => void): WireBlock[] {
+  const replay = readReplay(message, model, onHistoryDegrade)
   return message.content.map((block, index): WireBlock => {
     switch (block.type) {
       case 'text': return { type: 'text', text: block.text }
@@ -44,21 +44,27 @@ function assistant(message: Message, model: string, onReplayDegrade?: (reason: s
  * @param history - image-projected history with complete system snapshots; durable messages remain unchanged.
  * @param images - request versions for retained images.
  * @param access - execution-world paths for image descriptions.
- * @param onReplayDegrade - diagnostic for discarded native replay metadata.
+ * @param onHistoryDegrade - diagnostic for durable history this route cannot represent as written.
  * @param fileIds - resolved Files references; omission selects inline image bytes.
  * @returns the Messages API JSON body.
  */
 export function serialize(
   options: GenerateOptions, connection: Connection, history: readonly Message[],
   images: ReadonlyMap<ImageAttachmentRef['attachmentId'], RequestImageAttachment>, access: ImageAttachmentAccessResolver,
-  onReplayDegrade?: (reason: string) => void,
+  onHistoryDegrade?: (reason: string) => void,
   fileIds?: ReadonlyMap<ImageAttachmentRef['attachmentId'], DeepSeekFileId>,
 ): WireRequest {
   const model = connection.models.find(entry => entry.id === options.model)
   const inHistory = model?.systemPromptUpdate === 'in-history'
   const input = (blocks: readonly ContentBlock[]): WireInput[] => blocks.flatMap((block): WireInput[] => {
     if (block.type === 'text') return block.text ? [{ type: 'text', text: block.text }] : []
-    if (block.type !== 'image') return unsupported(`user/tool-result content ${block.type}`)
+    // Messages carries thinking only inside assistant turns. History that
+    // predates the writer's nontext filter can hold one here, and the durable
+    // record stays authoritative: drop the block so the turn remains sendable.
+    if (block.type !== 'image') {
+      onHistoryDegrade?.(`DeepSeek Messages cannot represent ${block.type} in user or tool-result content; dropped`)
+      return []
+    }
     const version = images.get(block.attachment.attachmentId)
     if (version === undefined) throw new LlmError('DeepSeek Messages request image is missing', 'INVALID_REQUEST')
     const fileId = fileIds?.get(block.attachment.attachmentId)
@@ -94,10 +100,12 @@ export function serialize(
       continue
     }
     if (message.role === 'assistant') flushSystemUpdates()
-    const content: WireBlock[] = message.role === 'assistant' ? assistant(message, options.model, onReplayDegrade) : message.content.flatMap((block): WireBlock[] => {
+    const content: WireBlock[] = message.role === 'assistant' ? assistant(message, options.model, onHistoryDegrade) : message.content.flatMap((block): WireBlock[] => {
       if (block.type !== 'tool-result') return input([block])
       return [{ type: 'tool_result', tool_use_id: block.toolCallId, content: input(block.content), ...block.isError === undefined ? {} : { is_error: block.isError } }]
     })
+    // A dropped block can leave nothing to send; Messages rejects an empty turn.
+    if (message.role === 'user' && content.length === 0) continue
     const previous = messages.at(-1)
     if (previous?.role === message.role) previous.content.push(...content)
     else messages.push({ role: message.role, content })

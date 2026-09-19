@@ -345,7 +345,7 @@ describe('Cordis provider composition', () => {
     const saved = JSON.stringify([assistant, result])
     const response = await assemble(ctx.llm.stream(options({ messages: [user(), assistant, result] })))
     expect(response.assembler.finish.kind).toBe('stop')
-    expect(warnings).toEqual([[`llm-deepseek: unusable Messages replay state on assistant history for route "deepseek-official/${MODEL}"; sending provider-neutral content (DeepSeek Messages replay: unsupported kind or version)`]])
+    expect(warnings).toEqual([[`llm-deepseek: unusable durable history on route "deepseek-official/${MODEL}"; sending representable content only (DeepSeek Messages replay: unsupported kind or version)`]])
     expect(http.requests).toHaveLength(1)
     expect(http.requests[0]?.body.messages).toEqual([
       { role: 'user', content: [{ type: 'text', text: 'hello' }] },

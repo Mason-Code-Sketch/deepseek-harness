@@ -33,8 +33,8 @@ export interface AdapterDependencies {
   files(): DeepSeekFileStore
   /** Prepare plugin-contributed fields for this exact HTTP request. */
   prepareExtensions: DeepSeekAdapterOptions['prepareExtensions']
-  /** Report discarded replay metadata without exposing durable content or signatures. */
-  onReplayDegrade?: (detail: { provider: string; model: string; reason: string }) => void
+  /** Report history this route cannot send as written; the diagnostic carries no message content or signatures. */
+  onHistoryDegrade?: (detail: { provider: string; model: string; reason: string }) => void
 }
 
 /** DeepSeek provider using Messages content and native thinking replay. */
@@ -111,7 +111,7 @@ export class DeepSeekMessagesAdapter extends LlmAdapter {
       }
       const history = inline ? inlineImages(messages, versions, connection) : messages
       const body = serialize(options, connection, history, versions, this.dependencies.imageAccess, (reason) => {
-        this.dependencies.onReplayDegrade?.({ provider: options.provider, model: options.model, reason })
+        this.dependencies.onHistoryDegrade?.({ provider: options.provider, model: options.model, reason })
       }, fileIds)
       const extensions = await prepareRequestExtensions(body as unknown as Readonly<Record<string, DeepSeekLlmApiJson>>, {
         signal,
