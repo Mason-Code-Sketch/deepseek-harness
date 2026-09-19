@@ -7,6 +7,9 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 // Type-only: pulls the ui-conversation slot declarations (the
 // conversation.session.header.utilities key) into this program.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+// Type-only: pulls the renderer's ctx.slots service merge; ui-conversation no
+// longer carries it through its emitted declarations.
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { BalancePill, UsagePill } from './QuotaPills.tsx'
 
 /** Required services: the slot registry only; data arrives over HTTP. */
