@@ -662,6 +662,27 @@ describe('toStreamChunks', () => {
     ])
   })
 
+  it.each([
+    ['<br>', 'a<br>b'],
+    ['<br/>', 'a<br/>b'],
+    ['<br />', 'a<br />b'],
+    ['<BR>', 'a<BR>b'],
+    ['<Br/>', 'a<Br/>b'],
+  ])('normalizes %s break tags in both streamed and settled text', async (_label, source) => {
+    const normalized = source.replace(/<br\s*\/?>/gi, '\n')
+    const chunks = await collect(toStreamChunks(feed(
+      { type: 'text_start', contentIndex: 0, partial: assistant() },
+      { type: 'text_delta', contentIndex: 0, delta: source, partial: assistant() },
+      { type: 'text_end', contentIndex: 0, content: source, partial: assistant() },
+      { type: 'done', reason: 'stop', message: assistant({ content: [{ type: 'text', text: normalized }], usage: usage(1, 1) }) },
+    )))
+    expect(chunks.slice(0, 3)).toEqual([
+      { type: 'block-start', index: 0, blockType: 'text' },
+      { type: 'text-delta', index: 0, text: normalized },
+      { type: 'block-end', index: 0, block: { type: 'text', text: normalized } },
+    ])
+  })
+
   it('maps thinking events to reasoning blocks', async () => {
     const chunks = await collect(toStreamChunks(feed(
       { type: 'thinking_start', contentIndex: 0, partial: assistant() },

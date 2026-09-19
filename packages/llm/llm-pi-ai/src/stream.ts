@@ -30,6 +30,28 @@ export function mapUsage(usage: PiUsage): TokenUsage {
   }
 }
 
+/**
+ * Normalize HTML break tags emitted by some models (notably GLM-5.2 over the
+ * OpenAI-compatible SiliconFlow endpoint) into markdown line breaks. The
+ * assistant-Markdown renderer treats raw HTML as literal text, so an authored
+ * `<br>` would surface as the visible string `<br>` instead of a break; the
+ * harness vocabulary is markdown, so translate the tag at the stream edge
+ * before any text reaches the assembler, the persisted event log, or the
+ * client's streaming accumulator. Both the incremental `text_delta` and the
+ * settled `text_end` content pass through this so the streamed and final
+ * renders agree byte-for-byte.
+ *
+ * Only the bare void-element forms are translated (`<br>`, `<br/>`, `<br />`,
+ * case-insensitive). Attributed forms like `<br class="x">` are left alone:
+ * the assistant never authors them and matching them would widen the raw-HTML
+ * surface for no benefit.
+ * @param text - one text delta or one settled text block content.
+ * @returns the text with break tags replaced by `\n`.
+ */
+export function normalizeLineBreaks(text: string): string {
+  return text.replace(/<br\s*\/?>/gi, '\n')
+}
+
 // XXX(pi-ai upstream): pi-ai flattens the caught error to `error.message`
 // (api/anthropic-messages.js: `errorMessage = error instanceof Error ?
 // error.message : JSON.stringify(error)`), discarding the original Error and its
@@ -154,10 +176,10 @@ export async function* toStreamChunks(
         yield { type: 'block-start', index: event.contentIndex, blockType: 'text' }
         break
       case 'text_delta':
-        yield { type: 'text-delta', index: event.contentIndex, text: event.delta }
+        yield { type: 'text-delta', index: event.contentIndex, text: normalizeLineBreaks(event.delta) }
         break
       case 'text_end':
-        yield { type: 'block-end', index: event.contentIndex, block: { type: 'text', text: event.content } }
+        yield { type: 'block-end', index: event.contentIndex, block: { type: 'text', text: normalizeLineBreaks(event.content) } }
         break
       case 'thinking_start':
         yield { type: 'block-start', index: event.contentIndex, blockType: 'reasoning' }

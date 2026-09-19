@@ -168,9 +168,9 @@ export function apply(ctx: Context): void {
     }
   }
 
-  async function snapshot(): Promise<QuotaSnapshot> {
+  async function snapshot(force: boolean): Promise<QuotaSnapshot> {
     const now = Date.now()
-    if (cache !== null && now - cache.time < CACHE_TTL_MS) return cache.data
+    if (!force && cache !== null && now - cache.time < CACHE_TTL_MS) return cache.data
     if (inflight !== null) return inflight
     inflight = load().then((data) => {
       cache = { time: Date.now(), data }
@@ -184,9 +184,11 @@ export function apply(ctx: Context): void {
   const disposeRoute = ctx.webServer.register({
     kind: 'exact',
     path: ROUTE_PATH,
-    handler: async (_req, res) => {
+    handler: async (req, res) => {
       try {
-        const data = await snapshot()
+        const url = new URL(req.url ?? '/', 'http://localhost')
+        const force = url.searchParams.get('force') === '1'
+        const data = await snapshot(force)
         res.writeHead(200, {
           'content-type': 'application/json; charset=utf-8',
           'cache-control': 'no-store',

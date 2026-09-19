@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import styles from './QuotaPills.module.css'
 
 const SNAPSHOT_URL = '/quota-panel/snapshot'
-const POLL_MS = 15_000
+const POLL_MS = 5_000
 const COUNTDOWN_TICK_MS = 30_000
 
 interface BalanceWindow {
@@ -47,15 +47,15 @@ interface SnapshotState {
   readonly data?: QuotaSnapshot
 }
 
-/** Poll the snapshot route every 15 seconds; `refresh` forces a refetch. */
+/** Poll the snapshot route every 5 seconds; `refresh` forces an upstream refetch. */
 function useSnapshot(): { state: SnapshotState; refresh: () => void } {
   const [state, setState] = useState<SnapshotState>({ kind: 'loading' })
-  const [generation, setGeneration] = useState(0)
   const alive = useRef(true)
 
-  const load = useCallback(async (): Promise<void> => {
+  const load = useCallback(async (force: boolean): Promise<void> => {
     try {
-      const response = await fetch(SNAPSHOT_URL, { cache: 'no-store' })
+      const url = force ? `${SNAPSHOT_URL}?force=1` : SNAPSHOT_URL
+      const response = await fetch(url, { cache: 'no-store' })
       if (!response.ok) throw new Error(`HTTP_${response.status}`)
       const data = await response.json() as unknown
       const snapshot = data as QuotaSnapshot
@@ -70,15 +70,15 @@ function useSnapshot(): { state: SnapshotState; refresh: () => void } {
 
   useEffect(() => {
     alive.current = true
-    void load()
-    const poll = setInterval(() => { void load() }, POLL_MS)
+    void load(false)
+    const poll = setInterval(() => { void load(false) }, POLL_MS)
     return () => {
       alive.current = false
       clearInterval(poll)
     }
-  }, [load, generation])
+  }, [load])
 
-  const refresh = useCallback(() => { setGeneration(value => value + 1) }, [])
+  const refresh = useCallback(() => { void load(true) }, [load])
   return { state, refresh }
 }
 
