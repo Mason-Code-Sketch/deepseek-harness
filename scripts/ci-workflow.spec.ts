@@ -232,7 +232,9 @@ describe('CI workflow', () => {
 
     // windows-coverage uses the lower 4-partition profile.
     expect(windowsCoverage.name).toBe('windows node 24 / coverage')
-    expect(windowsCoverage.env).toMatchObject({ DSH_COVERAGE_PARTITIONS: '4' })
+    expect(windowsCoverage.env).toMatchObject({
+      DSH_COVERAGE_PARTITIONS: "${{ github.event.repository.fork && '2' || '4' }}",
+    })
     const coverageSteps = windowsCoverage.steps as unknown[]
     const coverageCommands = coverageSteps.filter((step): step is Record<string, unknown> & { run: string } => (
       isRecord(step) && typeof step.run === 'string'
@@ -348,7 +350,7 @@ describe('CI workflow', () => {
       return evaluateRunsOn(expression, {
         vars,
         fromJSON: JSON.parse,
-        github: { event: { pull_request: { user: { login } } } },
+        github: { event: { repository: { fork: false }, pull_request: { user: { login } } } },
       })
     }
     for (const [name, selector, variable, pool, hosted] of [
@@ -385,6 +387,73 @@ describe('CI workflow', () => {
     // possible, so the first failure must not truncate the rest.
     expect(windowsObservational.env).toBeDefined()
     expect(windowsObservational.env).not.toMatchObject({ DSH_GATE_FAIL_FAST: '1' })
+  })
+
+  it('uses standard hosted pools for forks without changing explicit failover selections', () => {
+    const workflow = loadWorkflow('.github/workflows/ci.yml')
+    for (const [jobs, variable, hosted] of [
+      [['node-24', 'node-24-coverage', 'node-24-consumers'], 'DSH_CI_FAILOVER_LINUX', 'ubuntu-24.04'],
+      [['windows-build', 'windows-coverage', 'windows-native-tests', 'windows-observational'], 'DSH_CI_FAILOVER_WINDOWS', 'windows-2025'],
+    ] as const) {
+      for (const name of jobs) {
+        const selector = workflowJob(workflow, name)['runs-on']
+        const evaluate = (mode: string, login = 'maintainer'): unknown => evaluateRunsOn(selector, {
+          vars: { [variable]: mode },
+          fromJSON: JSON.parse,
+          github: { event: { repository: { fork: true }, pull_request: { user: { login } } } },
+        })
+        expect(evaluate(''), name).toBe(hosted)
+        expect(evaluate('selfhosted', 'dependabot[bot]'), name).toBe(hosted)
+        expect(evaluate('blacksmith'), name).toMatch(/^blacksmith-/)
+        expect(evaluate('selfhosted'), name).toContain('self-hosted')
+      }
+    }
+  })
+
+  it('reduces fork worker budgets without dropping required jobs', () => {
+    const workflow = loadWorkflow('.github/workflows/ci.yml')
+    for (const name of ['node-24', 'node-24-coverage', 'node-24-consumers', 'windows-coverage', 'windows-observational']) {
+      const job = workflowJob(workflow, name)
+      if (!isRecord(job.env)) throw new TypeError(`${name} must define its worker budgets`)
+      const budgets = Object.entries(job.env).filter(([key]) => /(?:CONCURRENCY|WORKERS|PARTITIONS|THREADS)$/.test(key))
+      expect(budgets.length, name).toBeGreaterThan(0)
+      for (const [key, value] of budgets) {
+        const budget = evaluateRunsOn(value, { github: { event: { repository: { fork: true } } } })
+        expect(Number(budget), `${name} ${key}`).toBeLessThanOrEqual(key === 'DSH_SNAPSHOT_MAX_CONCURRENCY' ? 4 : 2)
+      }
+      expect(job['continue-on-error'], name).toBe(name === 'windows-observational' ? true : undefined)
+    }
+  })
+
+  it('runs real API checks for same-repository PRs inside forks but never for external or Dependabot PRs', () => {
+    const e2e = workflowJob(loadWorkflow('.github/workflows/e2e.yml'), 'e2e')
+    const build = workflowJob(loadWorkflow('.github/workflows/build-exe-for-python-sdk.yml'), 'build')
+    if (!Array.isArray(build.steps)) throw new TypeError('Runtime build must define steps')
+    const liveSteps = build.steps.filter(isRecord).filter(step => typeof step.name === 'string'
+      && /(?:Preflight installed-wheel real API|Run installed-wheel real API)/.test(step.name))
+    expect(liveSteps).toHaveLength(4)
+    for (const job of [e2e, ...liveSteps]) {
+      if (!isRecord(job) || typeof job.if !== 'string') throw new TypeError('Real API check must have a condition')
+      for (const eventName of ['pull_request', 'push']) {
+        for (const fork of [false, true]) {
+          for (const external of [false, true]) {
+            for (const login of ['maintainer', 'dependabot[bot]']) {
+              const condition = job.if
+              const os = typeof job.name === 'string' && job.name.includes('(Windows)') ? 'Windows' : 'Linux'
+              const result: unknown = runInNewContext(condition, {
+                inputs: { ci: true }, runner: { os },
+                github: {
+                  repository: 'owner/harness', event_name: eventName,
+                  event: { pull_request: { head: { repo: { fork, full_name: external ? 'other/harness' : 'owner/harness' } }, user: { login } } },
+                },
+              }, { timeout: 1000 })
+              expect(result, `${String(job.name)} ${eventName} fork=${fork} external=${external} ${login}`)
+                .toBe(eventName !== 'pull_request' || (!external && login !== 'dependabot[bot]'))
+            }
+          }
+        }
+      }
+    }
   })
 
   it('gates standalone keyless blacksmith jobs and benchmark tiers on the failover variables', () => {
@@ -825,7 +894,7 @@ describe('Python release workflows', () => {
       env: { DEEPSEEK_API_KEY: '${{ secrets.DEEPSEEK_API_KEY_EXTERNAL }}' },
     })
     expect(String(realApiPreflightPosix.if)).toContain('inputs.ci')
-    expect(String(realApiPreflightPosix.if)).toContain('head.repo.fork')
+    expect(String(realApiPreflightPosix.if)).toContain('head.repo.full_name != github.repository')
     expect(String(realApiPreflightPosix.if)).toContain('dependabot[bot]')
     expect(realApiPreflightWindows).toMatchObject({ shell: 'pwsh' })
     for (const step of [installedRealApiPosix, installedRealApiWindows]) {
@@ -1045,7 +1114,7 @@ describe('Issue lifecycle workflow', () => {
     expect(preflightStep?.run).toContain('if [ -f .github/issue-management/selective-preflight.json ]; then')
     expect(preflightStep?.run).toContain('node .github/issue-management/policy.mjs pr-preflight')
     expect(preflightStep?.if).toBeUndefined()
-    expect(policyJob.if).toBeUndefined()
+    expect(policyJob.if).toBe("github.repository == 'deepseek-harness/deepseek-harness'")
     expect(validateStep?.if).toBe("${{ steps.preflight.outputs.legacy-automated != 'true' }}")
 
     expect(tokenStep).toMatchObject({

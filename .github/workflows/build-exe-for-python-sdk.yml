@@ -375,7 +375,7 @@ jobs:
           inputs.ci
           && runner.os != 'Windows'
           && (github.event_name != 'pull_request'
-              || !(github.event.pull_request.head.repo.fork
+              || !(github.event.pull_request.head.repo.full_name != github.repository
                    || github.event.pull_request.user.login == 'dependabot[bot]'))
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY_EXTERNAL }}
@@ -391,7 +391,7 @@ jobs:
           inputs.ci
           && runner.os == 'Windows'
           && (github.event_name != 'pull_request'
-              || !(github.event.pull_request.head.repo.fork
+              || !(github.event.pull_request.head.repo.full_name != github.repository
                    || github.event.pull_request.user.login == 'dependabot[bot]'))
         shell: pwsh
         env:
@@ -406,7 +406,7 @@ jobs:
           inputs.ci
           && runner.os != 'Windows'
           && (github.event_name != 'pull_request'
-              || !(github.event.pull_request.head.repo.fork
+              || !(github.event.pull_request.head.repo.full_name != github.repository
                    || github.event.pull_request.user.login == 'dependabot[bot]'))
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY_EXTERNAL }}
@@ -426,7 +426,7 @@ jobs:
           inputs.ci
           && runner.os == 'Windows'
           && (github.event_name != 'pull_request'
-              || !(github.event.pull_request.head.repo.fork
+              || !(github.event.pull_request.head.repo.full_name != github.repository
                    || github.event.pull_request.user.login == 'dependabot[bot]'))
         shell: pwsh
         env:

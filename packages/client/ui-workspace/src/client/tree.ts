@@ -324,7 +324,7 @@ export function partitionPinned<T extends { id: SessionId }>(
   const pinnedItems: T[] = []
   const rest: T[] = []
   for (const item of items) {
-    (pinned.has(item.id as string) ? pinnedItems : rest).push(item)
+    (pinned.has(item.id) ? pinnedItems : rest).push(item)
   }
   return [...pinnedItems, ...rest]
 }
@@ -403,7 +403,7 @@ export function deriveGroups(
     // member moves to the pinned section; empty Workspaces still show.
     const members: SessionSummary[] = []
     for (const session of g.sessions) {
-      if (pinned.has(session.id as string)) pinnedMembers.push(session)
+      if (pinned.has(session.id)) pinnedMembers.push(session)
       else members.push(session)
     }
     if (g.key === UNGROUPED_KEY && members.length === 0) continue

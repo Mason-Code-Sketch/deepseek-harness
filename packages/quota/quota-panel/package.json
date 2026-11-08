@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-quota-panel",
   "description": "Quota panel host half: one local webServer route serving DeepSeek balance and OpenCode Go usage snapshots to the browser pill",
-  "version": "0.1.0-rc.5",
+  "version": "0.1.6-alpha.2",
   "publishConfig": {
     "access": "public"
   },
@@ -33,5 +33,9 @@
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-credentials": "workspace:^",
     "@deepseek-ai/dsh-host-webserver": "workspace:^"
-  }
+  },
+  "files": [
+    "lib/index.js",
+    "lib/types/**/*.d.ts"
+  ]
 }

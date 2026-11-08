@@ -41,5 +41,5 @@ export function apply(ctx: Context): void {
   tag.dataset.pluginCss = `${name}/stats-line-override.css`
   tag.textContent = CSS
   document.head.appendChild(tag)
-  ctx.effect(() => () => tag.remove())
+  ctx.effect(() => () => { tag.remove() })
 }

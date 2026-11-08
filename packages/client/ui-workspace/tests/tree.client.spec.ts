@@ -351,7 +351,7 @@ describe('deriveGroups', () => {
     // The folder keeps the account order of its remaining rows and its count
     // follows the visible rows (pinned moved out).
     expect(groups[1]!.sessions.map(node => node.id)).toEqual([sid('older'), sid('newer')])
-    expect(groups[1]!.sessions.every(node => node.pinned === false)).toBe(true)
+    expect(groups[1]!.sessions.map(node => node.pinned)).toEqual([false, false])
     expect(groups[1]!.sessionCount).toBe(2)
   })
 
@@ -402,7 +402,7 @@ describe('deriveGroups', () => {
     )
     expect(groups.map(group => group.key)).toEqual(['first'])
     expect(groups[0]!.sessions.map(node => node.id)).toEqual([sid('one'), sid('two')])
-    expect(groups[0]!.sessions.every(node => node.pinned === false)).toBe(true)
+    expect(groups[0]!.sessions.map(node => node.pinned)).toEqual([false, false])
   })
 })
 

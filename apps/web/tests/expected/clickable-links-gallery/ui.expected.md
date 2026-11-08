@@ -46,6 +46,7 @@
   - text: +1 -0
 - button "Edit src/tokens.css +1 -1" [expanded]:
   - img
+  - img
   - text: Edit
   - button "src/tokens.css"
   - text: +1 -1
@@ -53,6 +54,7 @@
 - text: "src/tokens.css - --inline-code: #EBEEF2; + --inline-code: #F5F5F5; └ +1 -1 · 1 file"
 - button "Inspect"
 - button "Tool call str_replace_editor · create" [expanded]:
+  - img
   - img
   - text: Tool call str_replace_editor · create
 - text: "IN { \"command\": \"create\", \"path\": \"docs/press.md\", \"file_text\": \"# Press kit\\n\" } OUT Created docs/press.md"
@@ -63,6 +65,7 @@
   - text: "Write permission denied: c/broken.css"
 - button "Read docs/guide.md" [expanded]:
   - img
+  - img
   - text: Read
   - button "docs/guide.md"
 - text: docs/guide.md
@@ -72,6 +75,7 @@
 - text: guide line 9 guide line 10 guide line 11 guide line 12
 - button "Inspect"
 - button "Grep linkColor" [expanded]:
+  - img
   - img
   - text: Grep linkColor
 - text: 9 matches · 3 files
@@ -99,6 +103,7 @@
 - button "Inspect"
 - button "Search clickable link styles, produced files ui" [expanded]:
   - img
+  - img
   - text: Search clickable link styles, produced files ui
 - paragraph:
   - text: Unify links per
@@ -114,12 +119,14 @@
 - button "Inspect"
 - button "Fetch https://docs.example.test/tokens" [expanded]:
   - img
+  - img
   - text: Fetch https://docs.example.test/tokens
 - link "https://docs.example.test/tokens":
   - /url: https://docs.example.test/tokens
 - text: HTTP 200
 - button "Inspect"
 - button "Tool call design_tokens_sync · design-platform.css" [expanded]:
+  - img
   - img
   - text: Tool call design_tokens_sync · design-platform.css
 - text: "IN { \"source\": \"design-platform.css\", \"dryRun\": false } OUT {\"synced\":true,\"tokens\":12}"

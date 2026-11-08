@@ -61,6 +61,7 @@
 - text: permission preset read-only
 - 'button "feedback Feedback recorded for session {{seededId}} Anonymous user: {{uuid}}." [expanded]':
   - img
+  - img
   - text: "feedback Feedback recorded for session {{seededId}} Anonymous user: {{uuid}}."
 - text: "Feedback recorded for session {{seededId}} Anonymous user: {{uuid}}."
 - textbox "Message or run a task, / commands, @ files or sessions"
