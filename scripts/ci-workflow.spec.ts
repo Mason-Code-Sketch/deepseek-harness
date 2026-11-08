@@ -429,7 +429,7 @@ describe('CI workflow', () => {
     const e2e = workflowJob(loadWorkflow('.github/workflows/e2e.yml'), 'e2e')
     const build = workflowJob(loadWorkflow('.github/workflows/build-exe-for-python-sdk.yml'), 'build')
     if (!Array.isArray(build.steps)) throw new TypeError('Runtime build must define steps')
-    const liveSteps = build.steps.filter(step => isRecord(step) && typeof step.name === 'string'
+    const liveSteps = build.steps.filter(isRecord).filter(step => typeof step.name === 'string'
       && /(?:Preflight installed-wheel real API|Run installed-wheel real API)/.test(step.name))
     expect(liveSteps).toHaveLength(4)
     for (const job of [e2e, ...liveSteps]) {
@@ -1114,7 +1114,7 @@ describe('Issue lifecycle workflow', () => {
     expect(preflightStep?.run).toContain('if [ -f .github/issue-management/selective-preflight.json ]; then')
     expect(preflightStep?.run).toContain('node .github/issue-management/policy.mjs pr-preflight')
     expect(preflightStep?.if).toBeUndefined()
-    expect(policyJob.if).toBeUndefined()
+    expect(policyJob.if).toBe("github.repository == 'deepseek-harness/deepseek-harness'")
     expect(validateStep?.if).toBe("${{ steps.preflight.outputs.legacy-automated != 'true' }}")
 
     expect(tokenStep).toMatchObject({
