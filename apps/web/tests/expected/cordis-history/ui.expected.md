@@ -40,6 +40,7 @@
   - text: Think No dynamic Plugins are present, so I will define the requested Host and Client Package.
 - button "Register Cordis Plugin snapshot noop does nothing, for the snapshot Ready" [expanded]:
   - img
+  - img
   - text: Register Cordis Plugin snapshot noop does nothing, for the snapshot Ready
 - tablist "Plugin source":
   - tab "Client"

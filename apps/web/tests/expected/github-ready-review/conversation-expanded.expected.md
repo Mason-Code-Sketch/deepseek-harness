@@ -2,8 +2,10 @@
   - treeitem "{{workspace}}" [expanded]:
     - img
     - text: {{workspace}}
-  - treeitem "Review deepseek-ai/deepseek-harness#314 Session actions for Review deepseek-ai/deepseek-harness#314" [selected]:
+  - treeitem "Review deepseek-ai/deepseek-harness#314 Pin session Session actions for Review deepseek-ai/deepseek-harness#314" [selected]:
     - text: Review deepseek-ai/deepseek-harness#314
+    - button "Pin session":
+      - img
     - button "Session actions for Review deepseek-ai/deepseek-harness#314":
       - img
 

@@ -35,7 +35,7 @@ describe('TypeScript aggregates', () => {
     ['tsconfig.client.json', 'client/ui-quota-panel'],
     ['tsconfig.client.json', 'client/ui-stats-line'],
   ])('%s builds %s before bundling its entry', (config, packagePath) => {
-    expect(readAggregate(config).projectReferences?.map(reference => reference.path))
+    expect(readAggregate(config).projectReferences?.map(reference => resolve(reference.path)))
       .toContain(resolve(root, 'packages', packagePath))
   })
 

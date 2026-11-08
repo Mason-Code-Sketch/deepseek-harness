@@ -332,17 +332,24 @@ describe('the durable dispatch-log arm', () => {
     // A spill backend that hangs until released.
     let releaseSave!: () => void
     const gate = new Promise<void>((resolve) => { releaseSave = resolve })
+    let saveStarted!: () => void
+    const saving = new Promise<void>((resolve) => { saveStarted = resolve })
     const store = ctx.spillStore as StubStore
     const realSave = store.saveText.bind(store)
     store.saveText = async (input) => {
+      saveStarted()
       await gate
       return realSave(input)
     }
     const events: { type: string; data: unknown }[] = []
-    const agent = observedAgent(ctx, 'dispatch-slow-spill', (type: string, data: unknown) => { events.push({ type, data }) })
+    let smallStarted!: () => void
+    const smallDispatch = new Promise<void>((resolve) => { smallStarted = resolve })
+    const agent = observedAgent(ctx, 'dispatch-slow-spill', (type: string, data: unknown) => {
+      events.push({ type, data })
+      if (type === 'tool/ptc-dispatch-start' && (data as { name: string }).name === 'small_read') smallStarted()
+    })
     ctx.tools.register(textTool('huge_read', 'H'.repeat(2_000)))
     ctx.tools.register(textTool('small_read', 'tiny'))
-    let smallAfterHuge = false
     const runPromise = ctx.tools.execute({
       signal: testToolSignal,
       callId: ToolCallId('parent-3'),
@@ -355,18 +362,21 @@ describe('the durable dispatch-log arm', () => {
         description: 'Prove log shaping is off the program path',
       },
       agent: agent as never,
-    }).then((result) => {
-      return result
+    })
+    onTestFinished(async () => {
+      releaseSave()
+      await runPromise
     })
     // The run cannot COMPLETE while the settle append is gated (drain waits
     // for logWork), but the program itself already ran both calls; release
     // the backend and observe the settle events land inside the turn.
-    await vi.waitFor(() => {
-      // The second dispatch STARTED while the first one's spill hung.
-      smallAfterHuge = events.some(event => event.type === 'tool/ptc-dispatch-start'
-        && (event.data as { name: string }).name === 'small_read')
-      if (!smallAfterHuge) throw new Error('small_read not started yet')
-    })
+    // Observe readiness directly: subprocess startup shares the lane's test
+    // budget rather than vi.waitFor's independent one-second deadline.
+    await Promise.race([
+      Promise.all([saving, smallDispatch]),
+      runPromise.then(() => { throw new Error('run completed before the gated spill was released') }),
+    ])
+    expect(store.saves).toHaveLength(0)
     releaseSave()
     const result = await runPromise
     expect(result.isError).toBe(false)
@@ -374,7 +384,6 @@ describe('the durable dispatch-log arm', () => {
     expect(result.value).toMatchObject({ result: 2_004 })
     const settles = events.filter(event => event.type === 'tool/ptc-dispatch')
     expect(settles).toHaveLength(2)
-    expect(smallAfterHuge).toBe(true)
   })
 
   it('a sustained slow backend backpressures the run instead of accumulating unbounded log tasks', async () => {

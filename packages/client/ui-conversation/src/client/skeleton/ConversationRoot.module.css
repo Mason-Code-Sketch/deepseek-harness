@@ -5,10 +5,9 @@
   height: 100%;
   min-width: 0;
   background: var(--dsw-alias-bg-base);
-  /* The conversation bar is 30% narrower than the shared 8px theme bar.
-     Keep the local mirror aligned with the WebKit rule below so the overlay
-     composer seat compensates for the actual conversation gutter. */
-  --dsh-conversation-scrollbar-width: calc(var(--dsh-scrollbar-width) * 0.7);
+  /* Scrollbar layout consumes whole CSS pixels. Use the same rounded width
+     for the compact bar and the overlay seat, avoiding fractional drift. */
+  --dsh-conversation-scrollbar-width: round(down, calc(var(--dsh-scrollbar-width) * 0.7), 1px);
 }
 
 /* 76px with its rule: the height of the Sidebar's tab strip and header row
@@ -406,7 +405,7 @@
    bar (8px × 70%): the right bar stays compact without changing the workspace
    sidebar's scrollbar geometry. */
 .scrollBody::-webkit-scrollbar {
-  width: 5.6px;
+  width: var(--dsh-conversation-scrollbar-width);
 }
 
 /* The bar also stops 2px short of the scroller's ends, matching its 2px edge
@@ -481,16 +480,10 @@
 
 .scrollBody:has([data-conversation-composer-overlay]) > .composerSeat {
   position: absolute;
-  /* Chat's seat rides this box's content box, which its own scrolling shortens
-     by the bar's width and which its 2px scrollbar edge offset (margin-right,
-     above) narrows. The overlay seat is against the padding box, so it must
-     give back both: the conversation bar width (this local variable, 70% of
-     ui-theme's --dsh-scrollbar-width, mirroring the WebKit rule above) plus the
-     2px offset. Chat reserves the engine-resolved width, so on an engine where
-     the resolved width differs from this fixed value the card drifts by half
-     the difference, an accepted residual risk recorded in
-     ([decision](../../../../../../.agents/notes/archived/bug-fix/2026-08-12-composer-overlay-seat-width-compensation.md)). */
-  right: calc(var(--dsh-conversation-scrollbar-width) + 2px);
+  /* Chat's content box reserves the compact bar. The overlay's containing
+     block is this same scrollBody, so its margin-right already applies to
+     both tabs: compensate only for the shared whole-pixel gutter width. */
+  right: var(--dsh-conversation-scrollbar-width);
   bottom: 0;
   left: 0;
 }

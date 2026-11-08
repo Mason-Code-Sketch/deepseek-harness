@@ -1,5 +1,6 @@
 - button "Think" [expanded]:
   - img
+  - img
   - text: Think
 - heading "Compact reasoning with a deliberately long summary with a deliberately long summary with a deliberately long summary with a deliberately long summary with a deliberately long summary with a deliberately long summary with a deliberately long summary with a deliberately long summary" [level=2]
 - paragraph:

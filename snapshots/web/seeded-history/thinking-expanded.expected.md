@@ -1,5 +1,6 @@
 - button "Think" [expanded]:
   - img
+  - img
   - text: Think
 - paragraph: The user wants me to read a.txt and b.txt, then reply with "DONE". Let me do both reads in parallel.
 
