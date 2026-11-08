@@ -21,26 +21,26 @@ function clientCssDeclarations(): string[] {
     .sort()
 }
 
-describe('client TypeScript aggregate', () => {
-  it.each(['ui-quota-panel', 'ui-stats-line'])('builds %s before bundling its client entry', (name) => {
-    const configPath = resolve(root, 'tsconfig.client.json')
-    const read = ts.readConfigFile(configPath, file => ts.sys.readFile(file))
-    if (read.error !== undefined) {
-      throw new Error(ts.flattenDiagnosticMessageText(read.error.messageText, '\n'))
-    }
-    const parsed = ts.parseJsonConfigFileContent(read.config, ts.sys, root)
-    expect(parsed.projectReferences?.map(reference => reference.path))
-      .toContain(resolve(root, 'packages/client', name))
+function readAggregate(name: string): ts.ParsedCommandLine {
+  const read = ts.readConfigFile(resolve(root, name), file => ts.sys.readFile(file))
+  if (read.error !== undefined) {
+    throw new Error(ts.flattenDiagnosticMessageText(read.error.messageText, '\n'))
+  }
+  return ts.parseJsonConfigFileContent(read.config, ts.sys, root)
+}
+
+describe('TypeScript aggregates', () => {
+  it.each([
+    ['tsconfig.host.json', 'quota/quota-panel'],
+    ['tsconfig.client.json', 'client/ui-quota-panel'],
+    ['tsconfig.client.json', 'client/ui-stats-line'],
+  ])('%s builds %s before bundling its entry', (config, packagePath) => {
+    expect(readAggregate(config).projectReferences?.map(reference => reference.path))
+      .toContain(resolve(root, 'packages', packagePath))
   })
 
-  it('loads package CSS declarations without relying on workspace-link realpaths', () => {
-    const configPath = resolve(root, 'tsconfig.client.json')
-    const read = ts.readConfigFile(configPath, file => ts.sys.readFile(file))
-    if (read.error !== undefined) {
-      throw new Error(ts.flattenDiagnosticMessageText(read.error.messageText, '\n'))
-    }
-    const parsed = ts.parseJsonConfigFileContent(read.config, ts.sys, root)
-    const loaded = parsed.fileNames
+  it('loads client CSS declarations without relying on workspace-link realpaths', () => {
+    const loaded = readAggregate('tsconfig.client.json').fileNames
       .map(file => file.replaceAll(sep, '/'))
       .filter(file => file.endsWith('/src/css-modules.d.ts'))
       .sort()

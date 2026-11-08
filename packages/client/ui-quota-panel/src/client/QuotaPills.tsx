@@ -3,6 +3,8 @@
  * one polling hook; the host route dedupes and caches the underlying fetches.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { PropsLocale, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from './locales.ts'
 import styles from './QuotaPills.module.css'
 
 const SNAPSHOT_URL = '/quota-panel/snapshot'
@@ -41,15 +43,20 @@ interface QuotaSnapshot {
     | { readonly ok: false; readonly error: string }
 }
 
-interface SnapshotState {
-  readonly kind: 'loading' | 'error' | 'data'
-  readonly error?: string
-  readonly data?: QuotaSnapshot
-}
+type SnapshotState =
+  | { readonly kind: 'loading' }
+  | { readonly kind: 'error'; readonly error: string }
+  | { readonly kind: 'data'; readonly data: QuotaSnapshot }
 
 /** Poll the snapshot route every 5 seconds; `refresh` forces an upstream refetch. */
 function useSnapshot(): { state: SnapshotState; refresh: () => void } {
   const [state, setState] = useState<SnapshotState>({ kind: 'loading' })
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const tick = setInterval(() => { setTick(value => value + 1) }, COUNTDOWN_TICK_MS)
+    return () => { clearInterval(tick) }
+  }, [])
+
   const alive = useRef(true)
 
   const load = useCallback(async (force: boolean): Promise<void> => {
@@ -88,16 +95,16 @@ function updatedLabel(fetchedAt: number): string {
   return date.toLocaleTimeString()
 }
 
-function errorLabel(error: string): string {
-  if (error === 'NO_KEY') return '未配置 API Key'
-  if (error === 'HTTP_401') return '凭据被拒绝'
-  if (error === 'HTTP_403') return '无订阅'
-  if (error === 'BAD_RESPONSE') return '响应格式异常'
-  if (error === 'UNAVAILABLE') return '余额不可用'
-  return '加载失败'
+function errorLabel(error: string, t: TranslateNS<'quotaPanel'>): string {
+  if (error === 'NO_KEY') return t('error.noKey')
+  if (error === 'HTTP_401') return t('error.credentials')
+  if (error === 'HTTP_403') return t('error.subscription')
+  if (error === 'BAD_RESPONSE') return t('error.response')
+  if (error === 'UNAVAILABLE') return t('error.unavailable')
+  return t('error.failed')
 }
 
-function countdown(iso: string | null): string {
+function countdown(iso: string | null, t: TranslateNS<'quotaPanel'>): string {
   if (iso === null || iso === '') return ''
   const ms = new Date(iso).getTime() - Date.now()
   if (Number.isNaN(ms)) return ''
@@ -105,9 +112,9 @@ function countdown(iso: string | null): string {
   const days = Math.floor(seconds / 86_400)
   const hours = Math.floor((seconds % 86_400) / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
-  if (days > 0) return `${days}天${hours}小时`
-  if (hours > 0) return `${hours}小时${minutes}分`
-  return `${minutes}分钟`
+  if (days > 0) return t('duration.days', { days, hours })
+  if (hours > 0) return t('duration.hours', { hours, minutes })
+  return t('duration.minutes', { minutes })
 }
 
 function fmtPercent(value: number): string {
@@ -115,23 +122,18 @@ function fmtPercent(value: number): string {
 }
 
 /** DeepSeek open-platform balance pill. */
-export function BalancePill() {
+export function BalancePill({ t }: PropsLocale<'quotaPanel'>) {
   const { state, refresh } = useSnapshot()
-  const [, setTick] = useState(0)
-  useEffect(() => {
-    const tick = setInterval(() => { setTick(value => value + 1) }, COUNTDOWN_TICK_MS)
-    return () => { clearInterval(tick) }
-  }, [])
 
   if (state.kind === 'loading') {
-    return <span className={styles.pill} title="余额加载中…">¥ …</span>
+    return <span className={styles.pill} title={t('balance.loading')}>¥ …</span>
   }
-  if (state.kind === 'error' || state.data === undefined) {
-    const label = errorLabel(state.error ?? 'FAILED')
+  if (state.kind === 'error') {
+    const label = errorLabel(state.error, t)
     return (
       <span
         className={`${styles.pill} ${styles.pillError}`}
-        title={`余额: ${label} · 点击重试`}
+        title={t('balance.retry', { error: label })}
         onClick={refresh}
       >
         ¥ {label}
@@ -143,20 +145,20 @@ export function BalancePill() {
     return (
       <span
         className={`${styles.pill} ${styles.pillError}`}
-        title={`余额: ${errorLabel(balance.error)} · 点击重试`}
+        title={t('balance.retry', { error: errorLabel(balance.error, t) })}
         onClick={refresh}
       >
-        ¥ {errorLabel(balance.error)}
+        ¥ {errorLabel(balance.error, t)}
       </span>
     )
   }
   const cny = balance.windows.find(window => window.currency === 'CNY')
   const lines = balance.windows.map(window =>
-    `${window.currency}: 总额 ${window.total} · 充值 ${window.toppedUp} · 赠送 ${window.granted}`)
-  const tooltip = `${lines.join('\n')}\n点击刷新 · 更新于 ${updatedLabel(state.data.fetchedAt)}`
+    t('balance.window', { currency: window.currency, total: window.total, toppedUp: window.toppedUp, granted: window.granted }))
+  const tooltip = `${lines.join('\n')}\n${t('updated', { time: updatedLabel(state.data.fetchedAt) })}`
   return (
     <span className={styles.pill} title={tooltip} onClick={refresh}>
-      <span className={styles.pillName}>deepseek</span>
+      <span className={styles.pillName}>{t('balance.brand')}</span>
       <span className={`${styles.pillNum} ${styles.accent}`}>
         {cny === undefined ? '—' : `¥${cny.total}`}
       </span>
@@ -165,34 +167,29 @@ export function BalancePill() {
 }
 
 const USAGE_WINDOWS = [
-  { key: 'rolling', name: '5h', full: '5小时窗口' },
-  { key: 'weekly', name: '周', full: '本周' },
-  { key: 'monthly', name: '月', full: '本月' },
+  { key: 'rolling', name: 'window.rolling.short', full: 'window.rolling.full' },
+  { key: 'weekly', name: 'window.weekly.short', full: 'window.weekly.full' },
+  { key: 'monthly', name: 'window.monthly.short', full: 'window.monthly.full' },
 ] as const
 
 type UsageKey = (typeof USAGE_WINDOWS)[number]['key']
 
 /** OpenCode Go usage pill: rolling 5h / weekly / monthly remaining percents. */
-export function UsagePill() {
+export function UsagePill({ t }: PropsLocale<'quotaPanel'>) {
   const { state, refresh } = useSnapshot()
-  const [, setTick] = useState(0)
-  useEffect(() => {
-    const tick = setInterval(() => { setTick(value => value + 1) }, COUNTDOWN_TICK_MS)
-    return () => { clearInterval(tick) }
-  }, [])
 
   if (state.kind === 'loading') {
-    return <span className={styles.pill} title="OpenCode Go 用量加载中…">Go …</span>
+    return <span className={styles.pill} title={t('usage.loading')}>{t('usage.brand')} …</span>
   }
-  if (state.kind === 'error' || state.data === undefined) {
-    const label = errorLabel(state.error ?? 'FAILED')
+  if (state.kind === 'error') {
+    const label = errorLabel(state.error, t)
     return (
       <span
         className={`${styles.pill} ${styles.pillError}`}
-        title={`OpenCode Go 用量: ${label} · 点击重试`}
+        title={t('usage.retry', { error: label })}
         onClick={refresh}
       >
-        Go {label}
+        {t('usage.brand')} {label}
       </span>
     )
   }
@@ -201,29 +198,30 @@ export function UsagePill() {
     return (
       <span
         className={`${styles.pill} ${styles.pillError}`}
-        title={`OpenCode Go 用量: ${errorLabel(usage.error)} · 点击重试`}
+        title={t('usage.retry', { error: errorLabel(usage.error, t) })}
         onClick={refresh}
       >
-        Go {errorLabel(usage.error)}
+        {t('usage.brand')} {errorLabel(usage.error, t)}
       </span>
     )
   }
   const lines = USAGE_WINDOWS.map(({ key, full }) => {
     const window = usage.windows[key as UsageKey]
-    if (window === null) return `${full}: 无数据`
-    const reset = countdown(window.resetsAt)
-    return `${full}: 已用 ${fmtPercent(window.used)}% · 剩余 ${fmtPercent(window.remaining)}%${reset === '' ? '' : ` · ${reset} 后重置`}`
+    if (window === null) return t('usage.noData', { window: t(full) })
+    const reset = countdown(window.resetsAt, t)
+    return t('usage.window', { window: t(full), used: fmtPercent(window.used), remaining: fmtPercent(window.remaining) })
+      + (reset === '' ? '' : t('usage.reset', { duration: reset }))
   })
-  const tooltip = `${lines.join('\n')}\n点击刷新 · 更新于 ${updatedLabel(state.data.fetchedAt)}`
+  const tooltip = `${lines.join('\n')}\n${t('updated', { time: updatedLabel(state.data.fetchedAt) })}`
   return (
     <span className={styles.pill} title={tooltip} onClick={refresh}>
-      <span className={styles.pillName}>Go</span>
+      <span className={styles.pillName}>{t('usage.brand')}</span>
       {USAGE_WINDOWS.map(({ key, name }) => {
         const window = usage.windows[key as UsageKey]
         const remaining = window === null ? null : window.remaining
         return (
           <span key={key} className={styles.window}>
-            {name} <span className={`${styles.pillNum} ${remaining === null ? '' : styles.accent}`}>
+            {t(name)} <span className={`${styles.pillNum} ${remaining === null ? '' : styles.accent}`}>
               {remaining === null ? '—' : `${fmtPercent(remaining)}%`}
             </span>
           </span>

@@ -4,7 +4,8 @@
   gap: 6px;
   padding: 3px 10px;
   border-radius: 999px;
-  border: 1px solid var(--dsw-alias-border-l1);
+  corner-shape: round;
+  border: 0.5px solid var(--dsw-alias-border-l1);
   background: var(--dsw-alias-bg-layer-1);
   font-size: 11px;
   line-height: 16px;
