@@ -23,8 +23,8 @@ type WorkspaceViewState = {
   groupExpansion: Record<string, boolean>
   /** Saved manual order per Workspace group plus the browser-local flat-list account. */
   sessionOrderByAccount: Record<string, string[]>
-  /** Pinned Session ids: pinned rows float to the top of every group and the flat list. */
-  pinnedSessionIds: string[]
+  /** Pinned Session ids; absent in pre-pin v5 snapshots. Pinned rows lead every group and the flat list. */
+  pinnedSessionIds?: string[]
 }
 
 /**

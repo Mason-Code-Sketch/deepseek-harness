@@ -32,12 +32,12 @@ function harness() {
   } as unknown as Context
   apply(ctx)
   async function request(url?: string) {
-    const writeHead = vi.fn()
-    const end = vi.fn()
+    const writeHead = vi.fn<(status: number, headers: Record<string, string>) => void>()
+    const end = vi.fn<(body: string) => void>()
     if (handler === undefined) throw new Error('route missing')
     await handler({ url } as Parameters<Handler>[0], { writeHead, end } as unknown as Parameters<Handler>[1])
     return {
-      status: writeHead.mock.calls[0]?.[0] as number,
+      status: writeHead.mock.calls[0]?.[0],
       headers: writeHead.mock.calls[0]?.[1],
       body: JSON.parse(end.mock.calls[0]?.[0] as string) as Record<string, unknown>,
     }
@@ -46,10 +46,10 @@ function harness() {
 }
 
 function providers(balance: unknown, usage: unknown) {
-  const fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+  const fetch = vi.fn(async (input: string, init?: RequestInit) => {
     expect(init?.headers).toEqual({ Authorization: 'Bearer test-key' })
     expect(init?.signal).toBeInstanceOf(AbortSignal)
-    const url = String(input)
+    const url = input
     if (url !== balanceUrl && url !== usageUrl) throw new Error(`unexpected provider ${url}`)
     return { ok: true, json: async () => url === balanceUrl ? balance : usage } as Response
   })
@@ -78,6 +78,7 @@ describe('quota snapshot route', () => {
 
   it.each([
     [undefined, undefined, { isAvailable: false, error: 'BAD_RESPONSE' }],
+    [null, null, { isAvailable: false, error: 'BAD_RESPONSE' }],
     [{ is_available: false }, {}, { isAvailable: false, error: 'UNAVAILABLE' }],
     [{ is_available: true }, { usage: {} }, { isAvailable: true, windows: [] }],
   ])('reports incomplete upstream data %#', async (balance, usage, expected) => {
@@ -148,6 +149,7 @@ describe('quota snapshot route', () => {
     expect((await h.request('')).status).toBe(200)
     const result = await h.request('http://[')
     expect(result.status).toBe(500)
-    expect(result.body).toMatchObject({ ok: false, error: expect.any(String) })
+    expect(result.body.ok).toBe(false)
+    expect(typeof result.body.error).toBe('string')
   })
 })

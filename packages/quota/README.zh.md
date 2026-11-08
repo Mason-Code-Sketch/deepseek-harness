@@ -7,7 +7,7 @@ kind: "package-group"
 
 [English](README.md) | 中文
 
-## 概要
+## 概述
 
 quota 组为浏览器配额面板提供账户余额和用量快照。它通过凭据服务解析提供方密钥，并通过主机 Web 服务器提供快照。
 

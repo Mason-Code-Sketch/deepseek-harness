@@ -7,7 +7,7 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-## 概要
+## 概述
 
 配额面板通过 `/quota-panel/snapshot` 向浏览器提供 DeepSeek 余额和 OpenCode Go 用量数据。它依赖 Web 服务器和凭据服务。
 

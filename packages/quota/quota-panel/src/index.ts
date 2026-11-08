@@ -60,12 +60,12 @@ export interface QuotaSnapshot {
 
 interface DeepSeekBalanceResponse {
   readonly is_available: boolean
-  readonly balance_infos?: readonly {
+  readonly balance_infos?: readonly ({
     readonly currency?: string
     readonly total_balance?: string
     readonly granted_balance?: string
     readonly topped_up_balance?: string
-  }[]
+  } | undefined)[]
 }
 
 interface OpenCodeUsageResponse {
@@ -104,7 +104,7 @@ function normalizeWindow(
 
 /** Normalize the raw DeepSeek balance response into display windows. */
 function normalizeBalance(raw: unknown): QuotaSnapshot['balance'] {
-  const data = raw as DeepSeekBalanceResponse
+  const data = raw as DeepSeekBalanceResponse | null | undefined
   if (typeof data?.is_available !== 'boolean') {
     return { isAvailable: false, error: 'BAD_RESPONSE' }
   }
@@ -125,7 +125,7 @@ function normalizeBalance(raw: unknown): QuotaSnapshot['balance'] {
 
 /** Normalize the raw OpenCode usage response into the three windows. */
 function normalizeUsage(raw: unknown): QuotaSnapshot['usage'] {
-  const data = raw as OpenCodeUsageResponse
+  const data = raw as OpenCodeUsageResponse | null | undefined
   const usage = data?.usage
   const rolling = normalizeWindow(usage?.rolling)
   const weekly = normalizeWindow(usage?.weekly)

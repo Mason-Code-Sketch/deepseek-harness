@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-quota-panel/README.md
 README.md: 755d6960db58934df7e2b265f2683d2f98de0b34
-README.zh.md: 7e04e0f375fc122fb0b292a24cbdecac2c94d310
+README.zh.md: 27661b8d881a46e14882c0c4b2166bda10062575

@@ -7,7 +7,7 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-## 概要
+## 概述
 
 统计行插件使会话统计信息居中显示为不截断的单行。它添加浏览器样式表；Node 入口不实现主机行为。
 

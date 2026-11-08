@@ -25,7 +25,8 @@ it('owns both localized header registrations through plugin disposal', async () 
     await fiber.dispose()
     expect(ctx.slots.entries('conversation.session.header.utilities')).toHaveLength(0)
     expect(ctx.locale.bind('quotaPanel')('window.weekly.full')).toBe('window.weekly.full')
-    expect(hostApply()).toBeUndefined()
+    hostApply()
+    expect(ctx.slots.entries('conversation.session.header.utilities')).toHaveLength(0)
   } finally {
     await ctx.fiber.dispose()
   }

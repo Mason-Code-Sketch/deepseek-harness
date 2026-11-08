@@ -65,9 +65,9 @@ function useSnapshot(): { state: SnapshotState; refresh: () => void } {
       const response = await fetch(url, { cache: 'no-store' })
       if (!response.ok) throw new Error(`HTTP_${response.status}`)
       const data = await response.json() as unknown
-      const snapshot = data as QuotaSnapshot
+      const snapshot = data as { readonly ok?: unknown } | null | undefined
       if (!alive.current) return
-      if (snapshot?.ok === true) setState({ kind: 'data', data: snapshot })
+      if (snapshot?.ok === true) setState({ kind: 'data', data: data as QuotaSnapshot })
       else setState({ kind: 'error', error: 'BAD_RESPONSE' })
     } catch (error) {
       if (!alive.current) return
@@ -172,8 +172,6 @@ const USAGE_WINDOWS = [
   { key: 'monthly', name: 'window.monthly.short', full: 'window.monthly.full' },
 ] as const
 
-type UsageKey = (typeof USAGE_WINDOWS)[number]['key']
-
 /** OpenCode Go usage pill: rolling 5h / weekly / monthly remaining percents. */
 export function UsagePill({ t }: PropsLocale<'quotaPanel'>) {
   const { state, refresh } = useSnapshot()
@@ -206,7 +204,7 @@ export function UsagePill({ t }: PropsLocale<'quotaPanel'>) {
     )
   }
   const lines = USAGE_WINDOWS.map(({ key, full }) => {
-    const window = usage.windows[key as UsageKey]
+    const window = usage.windows[key]
     if (window === null) return t('usage.noData', { window: t(full) })
     const reset = countdown(window.resetsAt, t)
     return t('usage.window', { window: t(full), used: fmtPercent(window.used), remaining: fmtPercent(window.remaining) })
@@ -217,7 +215,7 @@ export function UsagePill({ t }: PropsLocale<'quotaPanel'>) {
     <span className={styles.pill} title={tooltip} onClick={refresh}>
       <span className={styles.pillName}>{t('usage.brand')}</span>
       {USAGE_WINDOWS.map(({ key, name }) => {
-        const window = usage.windows[key as UsageKey]
+        const window = usage.windows[key]
         const remaining = window === null ? null : window.remaining
         return (
           <span key={key} className={styles.window}>

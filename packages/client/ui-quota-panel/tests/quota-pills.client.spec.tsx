@@ -37,7 +37,7 @@ describe.each([
     render(<><BalancePill t={t} /><UsagePill t={t} /></>)
     expect(screen.getByTitle(dictionary['balance.loading'])).toBeTruthy()
     expect(screen.getByTitle(dictionary['usage.loading'])).toBeTruthy()
-    await waitFor(() => expect(screen.getByText('¥12.34')).toBeTruthy())
+    await waitFor(() => { expect(screen.getByText('¥12.34')).toBeTruthy() })
     const balancePill = screen.getByText('deepseek').parentElement!
     const usagePill = screen.getByText('Go').parentElement!
     expect(balancePill.title).toContain(balance)
@@ -59,7 +59,7 @@ describe.each([
     }) }))
     const t = translate(dictionary)
     render(<><BalancePill t={t} /><UsagePill t={t} /></>)
-    await waitFor(() => expect(screen.getByTitle(t('balance.retry', { error: dictionary[key] }))).toBeTruthy())
+    await waitFor(() => { expect(screen.getByTitle(t('balance.retry', { error: dictionary[key] }))).toBeTruthy() })
     expect(screen.getByTitle(t('usage.retry', { error: dictionary[key] }))).toBeTruthy()
   })
 })
@@ -76,7 +76,7 @@ describe('quota polling lifecycle', () => {
       ? { ok: false, status: 401 }
       : { ok: true, json: async () => response }))
     render(<><BalancePill t={t} /><UsagePill t={t} /></>)
-    await waitFor(() => expect(screen.getByTitle(t('balance.retry', { error: label }))).toBeTruthy())
+    await waitFor(() => { expect(screen.getByTitle(t('balance.retry', { error: label }))).toBeTruthy() })
     expect(screen.getByTitle(t('usage.retry', { error: label }))).toBeTruthy()
   })
 
@@ -88,7 +88,7 @@ describe('quota polling lifecycle', () => {
     render(<BalancePill t={t} />)
     const error = await screen.findByTitle(t('balance.retry', { error: 'Failed to load' }))
     fireEvent.click(error)
-    await waitFor(() => expect(screen.getByText('deepseek')).toBeTruthy())
+    await waitFor(() => { expect(screen.getByText('deepseek')).toBeTruthy() })
     expect(screen.getByText('deepseek').parentElement!.title).toBe('\nClick to refresh · Updated at —')
     expect(screen.getByText('—')).toBeTruthy()
   })
@@ -108,7 +108,7 @@ describe('quota polling lifecycle', () => {
       } },
     }) }))
     render(<UsagePill t={t} />)
-    await waitFor(() => expect(screen.queryByTitle(en['usage.loading'])).toBeNull())
+    await waitFor(() => { expect(screen.queryByTitle(en['usage.loading'])).toBeNull() })
     const title = screen.getByText('Go').parentElement!.title
     expect(title.includes('Resets in')).toBe(text !== '')
     if (text !== '') expect(title).toContain(`Resets in ${text}`)

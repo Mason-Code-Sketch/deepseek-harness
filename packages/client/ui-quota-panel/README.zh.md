@@ -7,7 +7,7 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-## 概要
+## 概述
 
 配额面板在会话页眉工具旁显示 DeepSeek 余额和 OpenCode Go 用量。浏览器入口读取 `/quota-panel/snapshot`；Node 入口不实现主机行为。
 

@@ -17,7 +17,8 @@ it('adds its stylesheet once per plugin lifetime and removes it on disposal', as
     expect(tags[0]!.textContent).toContain('flex: none')
     await fiber.dispose()
     expect(document.head.querySelectorAll(selector)).toHaveLength(0)
-    expect(hostApply()).toBeUndefined()
+    hostApply()
+    expect(document.head.querySelectorAll(selector)).toHaveLength(0)
   } finally {
     await ctx.fiber.dispose()
   }
