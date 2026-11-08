@@ -22,6 +22,17 @@ function clientCssDeclarations(): string[] {
 }
 
 describe('client TypeScript aggregate', () => {
+  it.each(['ui-quota-panel', 'ui-stats-line'])('builds %s before bundling its client entry', (name) => {
+    const configPath = resolve(root, 'tsconfig.client.json')
+    const read = ts.readConfigFile(configPath, file => ts.sys.readFile(file))
+    if (read.error !== undefined) {
+      throw new Error(ts.flattenDiagnosticMessageText(read.error.messageText, '\n'))
+    }
+    const parsed = ts.parseJsonConfigFileContent(read.config, ts.sys, root)
+    expect(parsed.projectReferences?.map(reference => reference.path))
+      .toContain(resolve(root, 'packages/client', name))
+  })
+
   it('loads package CSS declarations without relying on workspace-link realpaths', () => {
     const configPath = resolve(root, 'tsconfig.client.json')
     const read = ts.readConfigFile(configPath, file => ts.sys.readFile(file))

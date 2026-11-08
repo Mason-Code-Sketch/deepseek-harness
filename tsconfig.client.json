@@ -78,6 +78,8 @@
     { "path": "./packages/client/ui-approval" },
     { "path": "./packages/client/ui-chat" },
     { "path": "./packages/client/ui-conversation" },
+    { "path": "./packages/client/ui-quota-panel" },
+    { "path": "./packages/client/ui-stats-line" },
     { "path": "./packages/client/ui-tool" },
     { "path": "./packages/client/ui-deliverables/tsconfig.client.json" },
     { "path": "./packages/client/ui-workflow-run" },
